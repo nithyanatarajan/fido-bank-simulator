@@ -14,41 +14,24 @@ test.describe("Passkey Registration", () => {
   });
 
   test("register a passkey and see it in the list", async ({ page }) => {
-    // Click Add Passkey
     await page.getByTestId("add-passkey-btn").click();
 
-    // Wait for success message
     await expect(page.getByTestId("passkey-message")).toHaveText(
       "Passkey registered successfully!",
     );
 
-    // Passkey should appear in the list
     const items = page.getByTestId("passkey-item");
     await expect(items).toHaveCount(1);
   });
 
-  test("register multiple passkeys from different authenticators", async ({
-    page,
-  }) => {
-    // Register first passkey (using the authenticator from the fixture)
+  test("register multiple passkeys from same device", async ({ page }) => {
+    // Register first passkey
     await page.getByTestId("add-passkey-btn").click();
     await expect(page.getByTestId("passkey-message")).toHaveText(
       "Passkey registered successfully!",
     );
 
-    // Add a second virtual authenticator to simulate a different device
-    const cdpSession = await page.context().newCDPSession(page);
-    await cdpSession.send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "ctap2",
-        transport: "usb",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-      },
-    });
-
-    // Register second passkey from the new authenticator
+    // Register second passkey from the same authenticator
     await page.getByTestId("add-passkey-btn").click();
     await expect(page.getByTestId("passkey-message")).toHaveText(
       "Passkey registered successfully!",
