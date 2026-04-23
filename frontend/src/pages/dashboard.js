@@ -2,7 +2,7 @@
  * Dashboard page showing user info, passkeys, and actions.
  */
 import { logout } from '../api.js';
-import { registerPasskey } from '../webauthn.js';
+import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
 /**
  * Load and display the passkey list.
@@ -62,6 +62,7 @@ export function renderDashboard(container, username, onLogout) {
 
   const passkeyList = container.querySelector('[data-testid="passkey-list"]');
   const passkeyMsg = container.querySelector('#passkey-message');
+  const transferMsg = container.querySelector('#transfer-message');
 
   // Load existing passkeys
   loadPasskeys(passkeyList);
@@ -77,6 +78,39 @@ export function renderDashboard(container, username, onLogout) {
     } catch (err) {
       passkeyMsg.textContent = err.message;
       passkeyMsg.className = 'error';
+    }
+  });
+
+  // Wire Transfer Money button
+  container.querySelector('#transfer-btn').addEventListener('click', async () => {
+    transferMsg.textContent = '';
+    transferMsg.className = '';
+    try {
+      const resp = await fetch('/transfer', { method: 'POST' });
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.message || 'Transfer failed');
+      }
+      const data = await resp.json();
+
+      if (data.status === 'step_up_required') {
+        transferMsg.textContent = 'Step-up required. Verifying passkey...';
+        transferMsg.className = 'success';
+        try {
+          await authenticatePasskey();
+          transferMsg.textContent = 'Transfer completed successfully!';
+          transferMsg.className = 'success';
+        } catch (authErr) {
+          transferMsg.textContent = `Step-up failed: ${authErr.message}`;
+          transferMsg.className = 'error';
+        }
+      } else {
+        transferMsg.textContent = 'Transfer completed successfully!';
+        transferMsg.className = 'success';
+      }
+    } catch (err) {
+      transferMsg.textContent = err.message;
+      transferMsg.className = 'error';
     }
   });
 
