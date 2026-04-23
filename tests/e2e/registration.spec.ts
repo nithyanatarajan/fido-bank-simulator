@@ -5,7 +5,7 @@ test.describe("Passkey Registration", () => {
     await page.goto("/");
 
     // Register and login a user
-    await page.getByRole("button", { name: "Register" }).click();
+    await page.getByRole("button", { name: "New Account" }).click();
     const username = `passkeyuser_${Date.now()}`;
     await page.getByTestId("username").fill(username);
     await page.getByTestId("password").fill("testpass123");

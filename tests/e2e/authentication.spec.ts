@@ -6,7 +6,7 @@ test.describe("Step-Up Authentication", () => {
 
     // Register and login a user
     const username = `authuser_${Date.now()}`;
-    await page.getByRole("button", { name: "Register" }).click();
+    await page.getByRole("button", { name: "New Account" }).click();
     await page.getByTestId("username").fill(username);
     await page.getByTestId("password").fill("testpass123");
     await page.getByTestId("submit-btn").click();
