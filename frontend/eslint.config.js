@@ -12,6 +12,7 @@ export default [
         atob: 'readonly',
         btoa: 'readonly',
         console: 'readonly',
+        setTimeout: 'readonly',
       },
     },
     rules: {

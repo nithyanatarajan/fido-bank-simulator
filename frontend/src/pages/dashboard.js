@@ -1,13 +1,9 @@
 /**
- * Dashboard page showing user info, passkeys, and actions.
+ * Dashboard page showing user info, passkeys, and banking actions.
  */
 import { logout } from '../api.js';
 import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
-/**
- * Load and display the passkey list.
- * @param {HTMLElement} listEl
- */
 async function loadPasskeys(listEl) {
   try {
     const resp = await fetch('/fido/credentials');
@@ -15,76 +11,134 @@ async function loadPasskeys(listEl) {
     const data = await resp.json();
     const creds = data.credentials || [];
     if (creds.length === 0) {
-      listEl.innerHTML = '<li>No passkeys registered</li>';
+      listEl.innerHTML = `
+        <div class="text-center text-muted py-4">
+          <div class="mb-2" style="font-size: 2rem;">&#128274;</div>
+          <p class="mb-0">No passkeys registered yet</p>
+          <small>Add a passkey to enable secure step-up authentication</small>
+        </div>
+      `;
     } else {
       listEl.innerHTML = creds
         .map(
-          (c, i) =>
-            `<li data-testid="passkey-item">Passkey ${i + 1}: ${c.credential_id.substring(0, 16)}...</li>`,
+          (c, i) => `
+          <li class="list-group-item" data-testid="passkey-item">
+            <div class="passkey-item">
+              <span class="passkey-icon">&#128273;</span>
+              <div>
+                <div class="fw-medium">Passkey ${i + 1}</div>
+                <small class="text-muted">${c.credential_id.substring(0, 20)}...</small>
+              </div>
+            </div>
+          </li>`,
         )
         .join('');
     }
   } catch {
-    // Silently fail — list stays as-is
+    listEl.innerHTML = '<div class="text-center text-muted py-3">Failed to load passkeys</div>';
   }
 }
 
-/**
- * Render the dashboard into the given container.
- * @param {HTMLElement} container
- * @param {string} username
- * @param {function} onLogout - callback when logout completes
- */
 export function renderDashboard(container, username, onLogout) {
   container.innerHTML = `
-    <h1>FIDO Bank</h1>
-    <div class="card">
-      <h2>Welcome, <span data-testid="welcome-user">${username}</span></h2>
-    </div>
-    <div class="card">
-      <h2>Passkeys</h2>
-      <ul class="passkey-list" data-testid="passkey-list">
-        <li>No passkeys registered</li>
-      </ul>
-      <div style="margin-top: 1rem;">
-        <button class="btn-primary" data-testid="add-passkey-btn" id="add-passkey-btn">Add Passkey</button>
+    <nav class="navbar navbar-expand navbar-dark bg-dark">
+      <div class="container">
+        <span class="navbar-brand">SimpleFIDO Demo Bank</span>
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-light small" data-testid="welcome-user">${username}</span>
+          <button class="btn btn-outline-light btn-sm" data-testid="logout-btn" id="logout-btn">
+            Logout
+          </button>
+        </div>
       </div>
-      <div id="passkey-message" class="success" data-testid="passkey-message"></div>
-    </div>
-    <div class="card">
-      <div class="actions">
-        <button class="btn-secondary" data-testid="transfer-btn" id="transfer-btn">Transfer Money</button>
-        <button class="btn-danger" data-testid="logout-btn" id="logout-btn">Logout</button>
+    </nav>
+
+    <div class="dashboard-container">
+      <div class="row g-4 mt-1">
+        <!-- Security Section -->
+        <div class="col-12">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="card-title mb-0">&#128737; Security</h5>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small mb-3">
+                Passkeys let you verify your identity for sensitive actions like money transfers.
+              </p>
+              <ul class="list-group list-group-flush mb-3" id="passkey-list" data-testid="passkey-list">
+                <li class="list-group-item text-center text-muted py-3">Loading...</li>
+              </ul>
+              <button class="btn btn-primary" data-testid="add-passkey-btn" id="add-passkey-btn">
+                + Add Passkey
+              </button>
+              <div id="passkey-message" class="mt-2 small" data-testid="passkey-message"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Banking Section -->
+        <div class="col-12">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 pb-0">
+              <h5 class="card-title mb-0">&#128179; Banking</h5>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small mb-3">
+                Transfers require step-up verification with a registered passkey.
+              </p>
+              <button class="btn btn-success" data-testid="transfer-btn" id="transfer-btn">
+                Transfer Money
+              </button>
+              <div id="transfer-message" class="mt-2 small" data-testid="transfer-message"></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div id="transfer-message" data-testid="transfer-message"></div>
+    </div>
+
+    <!-- Step-up verification overlay (hidden by default) -->
+    <div id="step-up-overlay" class="step-up-overlay" style="display: none;">
+      <div class="step-up-card">
+        <div style="font-size: 3rem;" class="mb-3">&#128273;</div>
+        <h5 class="fw-bold mb-2">Verify Your Identity</h5>
+        <p class="text-muted mb-3" id="step-up-text">Use your passkey to authorize this transfer.</p>
+        <div class="spinner-border text-primary" role="status" id="step-up-spinner">
+          <span class="visually-hidden">Verifying...</span>
+        </div>
+      </div>
     </div>
   `;
 
-  const passkeyList = container.querySelector('[data-testid="passkey-list"]');
+  const passkeyList = container.querySelector('#passkey-list');
   const passkeyMsg = container.querySelector('#passkey-message');
   const transferMsg = container.querySelector('#transfer-message');
+  const stepUpOverlay = container.querySelector('#step-up-overlay');
+  const stepUpText = container.querySelector('#step-up-text');
+  const stepUpSpinner = container.querySelector('#step-up-spinner');
 
-  // Load existing passkeys
   loadPasskeys(passkeyList);
 
-  // Wire Add Passkey button
+  // Add Passkey
   container.querySelector('#add-passkey-btn').addEventListener('click', async () => {
     passkeyMsg.textContent = '';
-    passkeyMsg.className = 'success';
+    passkeyMsg.className = 'mt-2 small';
     try {
+      passkeyMsg.textContent = 'Waiting for authenticator...';
+      passkeyMsg.classList.add('text-muted');
       await registerPasskey();
       passkeyMsg.textContent = 'Passkey registered successfully!';
+      passkeyMsg.className = 'mt-2 small text-success';
       await loadPasskeys(passkeyList);
     } catch (err) {
       passkeyMsg.textContent = err.message;
-      passkeyMsg.className = 'error';
+      passkeyMsg.className = 'mt-2 small text-danger';
     }
   });
 
-  // Wire Transfer Money button
+  // Transfer Money with step-up
   container.querySelector('#transfer-btn').addEventListener('click', async () => {
     transferMsg.textContent = '';
-    transferMsg.className = '';
+    transferMsg.className = 'mt-2 small';
     try {
       const resp = await fetch('/transfer', { method: 'POST' });
       if (!resp.ok) {
@@ -94,23 +148,37 @@ export function renderDashboard(container, username, onLogout) {
       const data = await resp.json();
 
       if (data.status === 'step_up_required') {
-        transferMsg.textContent = 'Step-up required. Verifying passkey...';
-        transferMsg.className = 'success';
+        stepUpOverlay.style.display = 'flex';
+        stepUpText.textContent = 'Use your passkey to authorize this transfer.';
+        stepUpText.className = 'text-muted mb-3';
+        stepUpSpinner.style.display = '';
         try {
           await authenticatePasskey();
-          transferMsg.textContent = 'Transfer completed successfully!';
-          transferMsg.className = 'success';
+          stepUpText.textContent = 'Verified! Transfer complete.';
+          stepUpText.className = 'text-success mb-3 fw-medium';
+          stepUpSpinner.style.display = 'none';
+          setTimeout(() => {
+            stepUpOverlay.style.display = 'none';
+            transferMsg.textContent = 'Transfer completed successfully!';
+            transferMsg.className = 'mt-2 small text-success';
+          }, 1500);
         } catch (authErr) {
-          transferMsg.textContent = `Step-up failed: ${authErr.message}`;
-          transferMsg.className = 'error';
+          stepUpText.textContent = `Verification failed: ${authErr.message}`;
+          stepUpText.className = 'text-danger mb-3';
+          stepUpSpinner.style.display = 'none';
+          setTimeout(() => {
+            stepUpOverlay.style.display = 'none';
+            transferMsg.textContent = `Step-up failed: ${authErr.message}`;
+            transferMsg.className = 'mt-2 small text-danger';
+          }, 2000);
         }
       } else {
         transferMsg.textContent = 'Transfer completed successfully!';
-        transferMsg.className = 'success';
+        transferMsg.className = 'mt-2 small text-success';
       }
     } catch (err) {
       transferMsg.textContent = err.message;
-      transferMsg.className = 'error';
+      transferMsg.className = 'mt-2 small text-danger';
     }
   });
 
