@@ -94,8 +94,7 @@ class FidoService:
             id=user_id,
             display_name=username,
         )
-        existing = self.get_attested_credentials(username)
-        return self._server.register_begin(user, credentials=existing)
+        return self._server.register_begin(user, credentials=[])
 
     def register_complete(self, state: Any, response: Any) -> Any:
         """Complete FIDO2 registration. Returns auth_data."""
