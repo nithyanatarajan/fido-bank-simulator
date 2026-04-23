@@ -2,6 +2,32 @@
  * Dashboard page showing user info, passkeys, and actions.
  */
 import { logout } from '../api.js';
+import { registerPasskey } from '../webauthn.js';
+
+/**
+ * Load and display the passkey list.
+ * @param {HTMLElement} listEl
+ */
+async function loadPasskeys(listEl) {
+  try {
+    const resp = await fetch('/fido/credentials');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const creds = data.credentials || [];
+    if (creds.length === 0) {
+      listEl.innerHTML = '<li>No passkeys registered</li>';
+    } else {
+      listEl.innerHTML = creds
+        .map(
+          (c, i) =>
+            `<li data-testid="passkey-item">Passkey ${i + 1}: ${c.credential_id.substring(0, 16)}...</li>`,
+        )
+        .join('');
+    }
+  } catch {
+    // Silently fail — list stays as-is
+  }
+}
 
 /**
  * Render the dashboard into the given container.
@@ -34,10 +60,29 @@ export function renderDashboard(container, username, onLogout) {
     </div>
   `;
 
+  const passkeyList = container.querySelector('[data-testid="passkey-list"]');
+  const passkeyMsg = container.querySelector('#passkey-message');
+
+  // Load existing passkeys
+  loadPasskeys(passkeyList);
+
+  // Wire Add Passkey button
+  container.querySelector('#add-passkey-btn').addEventListener('click', async () => {
+    passkeyMsg.textContent = '';
+    passkeyMsg.className = 'success';
+    try {
+      await registerPasskey();
+      passkeyMsg.textContent = 'Passkey registered successfully!';
+      await loadPasskeys(passkeyList);
+    } catch (err) {
+      passkeyMsg.textContent = err.message;
+      passkeyMsg.className = 'error';
+    }
+  });
+
+  // Logout
   container.querySelector('#logout-btn').addEventListener('click', async () => {
     await logout();
     onLogout();
   });
-
-  // Passkey and transfer buttons will be wired in later tasks
 }
