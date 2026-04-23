@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Cookie
 from starlette.responses import JSONResponse
 
-from backend.models import FidoRegisterCompleteRequest
+from backend.models import FidoAuthCompleteRequest, FidoRegisterCompleteRequest
 from backend.services.fido_service import FidoService
 from backend.services.session import SessionManager
 
@@ -115,3 +115,48 @@ def get_credentials(session: str | None = Cookie(default=None)) -> dict[str, Any
             for c in creds
         ]
     }
+
+
+@router.post("/auth/begin", response_model=None)
+def auth_begin(session: str | None = Cookie(default=None)) -> dict[str, Any] | JSONResponse:
+    """Begin FIDO2 authentication. Returns publicKey options and challenge token."""
+    assert fido_service is not None
+    result = _get_username_or_401(session)
+    if isinstance(result, JSONResponse):
+        return result
+    username = result
+
+    creds = fido_service.get_credentials(username)
+    if not creds:
+        return JSONResponse(status_code=400, content={"message": "No passkeys registered"})
+
+    options, state = fido_service.authenticate_begin(username)
+    challenge_token = fido_service.create_challenge_token(state)
+
+    serialized = _serialize_public_key(dict(options))
+    return {
+        "publicKey": serialized.get("publicKey", serialized),
+        "challenge_token": challenge_token,
+    }
+
+
+@router.post("/auth/complete", response_model=None)
+def auth_complete(
+    req: FidoAuthCompleteRequest,
+    session: str | None = Cookie(default=None),
+) -> dict[str, str] | JSONResponse:
+    """Complete FIDO2 authentication. Validates assertion and updates sign count."""
+    assert fido_service is not None
+    result = _get_username_or_401(session)
+    if isinstance(result, JSONResponse):
+        return result
+    username = result
+
+    try:
+        state = fido_service.verify_challenge_token(req.challenge_token)
+        credentials = fido_service.get_attested_credentials(username)
+        credential = fido_service.authenticate_complete(state, credentials, req.assertion)
+        fido_service.update_sign_count(credential.credential_id, 0)
+        return {"status": "ok"}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"message": str(e)})

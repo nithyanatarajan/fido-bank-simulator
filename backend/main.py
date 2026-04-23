@@ -28,6 +28,9 @@ users.session_manager = session_manager
 fido.fido_service = fido_service
 fido.session_manager = session_manager
 
+banking.session_manager = session_manager
+banking.fido_stepup_enabled = settings.fido_stepup_enabled
+
 app.include_router(banking.router)
 app.include_router(users.router)
 app.include_router(fido.router)
