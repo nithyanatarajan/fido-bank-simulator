@@ -3,11 +3,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import settings
-from backend.routers import banking, fido, users
-from backend.services.fido_service import FidoService
-from backend.services.session import SessionManager
-from backend.services.user_store import UserStore
+from app.config import settings
+from app.routers import banking, fido, users
+from app.services.fido_service import FidoService
+from app.services.session import SessionManager
+from app.services.user_store import UserStore
 
 app = FastAPI(title="FIDO Bank Simulator")
 
@@ -35,6 +35,6 @@ app.include_router(banking.router)
 app.include_router(users.router)
 app.include_router(fido.router)
 
-static_dir = Path(__file__).parent.parent / "static"
+static_dir = Path(__file__).parent.parent.parent / "static"
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

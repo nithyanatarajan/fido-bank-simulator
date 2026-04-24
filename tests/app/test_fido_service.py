@@ -2,8 +2,7 @@
 
 import jwt
 import pytest
-
-from backend.services.fido_service import FidoService
+from app.services.fido_service import FidoService
 
 
 class TestCredentialStore:
@@ -13,7 +12,7 @@ class TestCredentialStore:
         self.service = FidoService(
             rp_id="localhost",
             rp_name="Test Bank",
-            rp_origin="http://localhost:8000",
+            rp_origin="http://localhost:9090",
             jwt_secret="test-secret",
         )
 
@@ -96,7 +95,7 @@ class TestChallengeTokens:
         self.service = FidoService(
             rp_id="localhost",
             rp_name="Test Bank",
-            rp_origin="http://localhost:8000",
+            rp_origin="http://localhost:9090",
             jwt_secret="test-secret",
         )
 

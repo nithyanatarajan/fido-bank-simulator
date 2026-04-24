@@ -1,6 +1,6 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-build
-WORKDIR /app/frontend
+WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
@@ -20,9 +20,13 @@ RUN uv sync --frozen --no-dev
 # Copy backend code
 COPY backend/ ./backend/
 
+# Copy env.sample
+COPY env.sample ./env.sample
+
 # Copy built frontend from stage 1
-COPY --from=frontend-build /app/static ./static/
+COPY --from=frontend-build /build/static ./static/
 
-EXPOSE 8000
+EXPOSE 9090
 
-CMD ["uv", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+WORKDIR /app/backend
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9090"]

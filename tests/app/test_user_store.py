@@ -1,8 +1,7 @@
 """Tests for the in-memory user store."""
 
 import pytest
-
-from backend.services.user_store import UserStore
+from app.services.user_store import UserStore
 
 
 class TestUserStore:

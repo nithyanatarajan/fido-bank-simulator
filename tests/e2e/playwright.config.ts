@@ -17,8 +17,8 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd ../../ && uv run uvicorn backend.main:app --port 8000',
-      port: 8000,
+      command: 'cd ../../backend && uv run uvicorn app.main:app --port 9090',
+      port: 9090,
       reuseExistingServer: !process.env.CI,
     },
     {

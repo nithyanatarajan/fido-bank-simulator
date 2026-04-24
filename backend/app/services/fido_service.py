@@ -112,7 +112,7 @@ class FidoService:
         """Complete FIDO2 authentication.
 
         Looks up the specific credential used (from assertion's rawId) and verifies
-        only against that one — not the full list.
+        only against that one -- not the full list.
         """
         cred = self.get_credential_by_id(credential_id)
         if cred is None:

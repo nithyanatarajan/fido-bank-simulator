@@ -15,7 +15,7 @@ tasks:
   backend:
     desc: Start FastAPI backend
     cmds:
-      - uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+      - cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 9090 --reload
 
   client:
     desc: Start Vite frontend dev server
@@ -38,7 +38,7 @@ tasks:
   test:backend:
     desc: Run Python backend tests
     cmds:
-      - uv run pytest tests/backend/ -v
+      - cd backend && uv run pytest ../tests/app/ -v
 
   test:e2e:
     desc: Run Playwright E2E tests
@@ -55,7 +55,7 @@ tasks:
   lint:backend:
     desc: Lint Python code
     cmds:
-      - uv run ruff check backend/ tests/backend/
+      - cd backend && uv run ruff check app/ ../tests/app/
 
   lint:frontend:
     desc: Lint JavaScript code
@@ -72,7 +72,7 @@ tasks:
   format:backend:
     desc: Format Python code
     cmds:
-      - uv run ruff format backend/ tests/backend/
+      - cd backend && uv run ruff format app/ ../tests/app/
 
   format:frontend:
     desc: Format JavaScript code
@@ -83,5 +83,5 @@ tasks:
   format:check:
     desc: Check formatting without modifying files
     cmds:
-      - uv run ruff format --check backend/ tests/backend/
+      - cd backend && uv run ruff format --check app/ ../tests/app/
       - cd frontend && npx prettier --check 'src/**/*.{js,html,css}'

@@ -1,6 +1,6 @@
 """Tests for session token management."""
 
-from backend.services.session import SessionManager
+from app.services.session import SessionManager
 
 
 class TestSessionManager:

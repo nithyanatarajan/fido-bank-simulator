@@ -4,12 +4,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/users': 'http://localhost:8000',
-      '/fido': 'http://localhost:8000',
-      '/transfer': 'http://localhost:8000',
-      '/risk': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/config': 'http://localhost:8000',
+      '/users': 'http://localhost:9090',
+      '/fido': 'http://localhost:9090',
+      '/transfer': 'http://localhost:9090',
+      '/risk': 'http://localhost:9090',
+      '/health': 'http://localhost:9090',
+      '/config': 'http://localhost:9090',
     },
   },
   build: {

@@ -1,9 +1,8 @@
 """Tests for user API endpoints."""
 
+from app.main import app
+from app.routers import users as users_module
 from starlette.testclient import TestClient
-
-from backend.main import app
-from backend.routers import users as users_module
 
 
 class TestUsersAPI:
@@ -11,7 +10,7 @@ class TestUsersAPI:
 
     def setup_method(self) -> None:
         """Reset the user store before each test."""
-        from backend.services.user_store import UserStore
+        from app.services.user_store import UserStore
 
         users_module.user_store = UserStore()
         self.client = TestClient(app)

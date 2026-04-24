@@ -7,9 +7,9 @@ from typing import Any
 from fastapi import APIRouter, Cookie
 from starlette.responses import JSONResponse
 
-from backend.models import FidoAuthCompleteRequest, FidoRegisterCompleteRequest
-from backend.services.fido_service import FidoService
-from backend.services.session import SessionManager
+from app.models import FidoAuthCompleteRequest, FidoRegisterCompleteRequest
+from app.services.fido_service import FidoService
+from app.services.session import SessionManager
 
 router = APIRouter(prefix="/fido", tags=["fido"])
 

@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Cookie, Response
 from starlette.responses import JSONResponse
 
-from backend.models import MessageResponse, UserLoginRequest, UserRegisterRequest, UserResponse
-from backend.services.session import SessionManager
-from backend.services.user_store import UserStore
+from app.models import MessageResponse, UserLoginRequest, UserRegisterRequest, UserResponse
+from app.services.session import SessionManager
+from app.services.user_store import UserStore
 
 router = APIRouter(prefix="/users", tags=["users"])
 

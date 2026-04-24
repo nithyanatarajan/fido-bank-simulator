@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Cookie
 from starlette.responses import JSONResponse
 
-from backend.services.session import SessionManager
+from app.services.session import SessionManager
 
 router = APIRouter(tags=["banking"])
 
