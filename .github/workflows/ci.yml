@@ -42,13 +42,9 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: ESLint
+      - name: Frontend lint + format check
         working-directory: frontend
-        run: npx eslint src/
-
-      - name: Prettier check
-        working-directory: frontend
-        run: npx prettier --check 'src/**/*.{js,html,css}'
+        run: pnpm run check
 
   test-backend:
     name: Backend Tests

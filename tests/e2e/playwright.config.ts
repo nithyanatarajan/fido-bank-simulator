@@ -22,7 +22,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'cd ../../frontend && npm run dev',
+      command: 'cd ../../frontend && pnpm dev',
       port: 5173,
       reuseExistingServer: !process.env.CI,
     },
