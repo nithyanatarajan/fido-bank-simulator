@@ -23,10 +23,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: Ruff check
-        run: cd backend && uv run ruff check app/ ../tests/app/
+        run: cd backend && uv run ruff check app/ tests/
 
       - name: Ruff format check
-        run: cd backend && uv run ruff format --check app/ ../tests/app/
+        run: cd backend && uv run ruff format --check app/ tests/
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -63,7 +63,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run tests
-        run: cd backend && uv run pytest ../tests/app/ -v
+        run: cd backend && uv run pytest tests/ -v
 
   test-frontend:
     name: Frontend Tests

@@ -39,7 +39,7 @@ tasks:
   test:backend:
     desc: Run Python backend tests
     cmds:
-      - cd backend && uv run pytest ../tests/app/ -v
+      - cd backend && uv run pytest tests/ -v
 
   test:frontend:
     desc: Run frontend unit tests
@@ -62,8 +62,8 @@ tasks:
   check:backend:
     desc: Check Python code (lint + format)
     cmds:
-      - cd backend && uv run ruff check app/ ../tests/app/
-      - cd backend && uv run ruff format --check app/ ../tests/app/
+      - cd backend && uv run ruff check app/ tests/
+      - cd backend && uv run ruff format --check app/ tests/
 
   check:frontend:
     desc: Check JavaScript code (lint + format)
@@ -80,8 +80,8 @@ tasks:
   fix:backend:
     desc: Fix Python code (lint + format)
     cmds:
-      - cd backend && uv run ruff check --fix app/ ../tests/app/
-      - cd backend && uv run ruff format app/ ../tests/app/
+      - cd backend && uv run ruff check --fix app/ tests/
+      - cd backend && uv run ruff format app/ tests/
 
   fix:frontend:
     desc: Fix JavaScript code (lint + format)
