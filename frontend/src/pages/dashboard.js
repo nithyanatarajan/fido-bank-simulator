@@ -4,7 +4,7 @@
 import { logout } from '../api.js';
 import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
-async function loadPasskeys(listEl) {
+async function loadPasskeys(listEl, onDelete) {
   try {
     const resp = await fetch('/fido/credentials');
     if (!resp.ok) return;
@@ -22,7 +22,7 @@ async function loadPasskeys(listEl) {
       listEl.innerHTML = creds
         .map(
           (c, i) => `
-          <li class="list-group-item" data-testid="passkey-item">
+          <li class="list-group-item d-flex justify-content-between align-items-center" data-testid="passkey-item">
             <div class="passkey-item">
               <span class="passkey-icon">&#128273;</span>
               <div>
@@ -30,9 +30,15 @@ async function loadPasskeys(listEl) {
                 <small class="text-muted">${c.credential_id.substring(0, 20)}...</small>
               </div>
             </div>
+            <button class="btn btn-outline-danger btn-sm" data-testid="delete-passkey-btn"
+                    data-credential-id="${c.credential_id}">&#10005;</button>
           </li>`,
         )
         .join('');
+
+      listEl.querySelectorAll('[data-testid="delete-passkey-btn"]').forEach((btn) => {
+        btn.addEventListener('click', () => onDelete(btn.dataset.credentialId));
+      });
     }
   } catch {
     listEl.innerHTML = '<div class="text-center text-muted py-3">Failed to load passkeys</div>';
@@ -56,14 +62,14 @@ export function renderDashboard(container, username, onLogout) {
     <div class="dashboard-container">
       <div class="row g-4 mt-1">
         <!-- Security Section -->
-        <div class="col-12">
-          <div class="card shadow-sm border-0">
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 pb-0">
               <h5 class="card-title mb-0">&#128737; Security</h5>
             </div>
             <div class="card-body">
               <p class="text-muted small mb-3">
-                Passkeys let you verify your identity for sensitive actions like money transfers.
+                Passkeys let you verify your identity for sensitive actions.
               </p>
               <ul class="list-group list-group-flush mb-3" id="passkey-list" data-testid="passkey-list">
                 <li class="list-group-item text-center text-muted py-3">Loading...</li>
@@ -77,8 +83,8 @@ export function renderDashboard(container, username, onLogout) {
         </div>
 
         <!-- Banking Section -->
-        <div class="col-12">
-          <div class="card shadow-sm border-0">
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 pb-0">
               <h5 class="card-title mb-0">&#128179; Banking</h5>
             </div>
@@ -116,7 +122,21 @@ export function renderDashboard(container, username, onLogout) {
   const stepUpText = container.querySelector('#step-up-text');
   const stepUpSpinner = container.querySelector('#step-up-spinner');
 
-  loadPasskeys(passkeyList);
+  async function handleDeletePasskey(credentialId) {
+    try {
+      const resp = await fetch(`/fido/credentials/${credentialId}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.message || 'Delete failed');
+      }
+      await loadPasskeys(passkeyList, handleDeletePasskey);
+    } catch (err) {
+      passkeyMsg.textContent = err.message;
+      passkeyMsg.className = 'mt-2 small text-danger';
+    }
+  }
+
+  loadPasskeys(passkeyList, handleDeletePasskey);
 
   // Add Passkey
   container.querySelector('#add-passkey-btn').addEventListener('click', async () => {
@@ -128,7 +148,7 @@ export function renderDashboard(container, username, onLogout) {
       await registerPasskey();
       passkeyMsg.textContent = 'Passkey registered successfully!';
       passkeyMsg.className = 'mt-2 small text-success';
-      await loadPasskeys(passkeyList);
+      await loadPasskeys(passkeyList, handleDeletePasskey);
     } catch (err) {
       passkeyMsg.textContent = err.message;
       passkeyMsg.className = 'mt-2 small text-danger';
