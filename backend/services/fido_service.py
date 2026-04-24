@@ -24,56 +24,50 @@ class FidoService:
     ) -> None:
         rp = PublicKeyCredentialRpEntity(name=rp_name, id=rp_id)
         allowed_origins = {rp_origin}
-        # Also allow the Vite dev server origin for local development
         if "localhost" in rp_origin:
             allowed_origins.add("http://localhost:5173")
         self._server = Fido2Server(rp, verify_origin=lambda o: o in allowed_origins)
         self._jwt_secret = jwt_secret
         self._jwt_expiry_seconds = jwt_expiry_seconds
-        # In-memory credential store: username -> list of credential dicts
-        self._credentials: dict[str, list[dict[str, Any]]] = {}
+        # Credential store keyed by credential_id (bytes) for direct lookup
+        self._credentials: dict[bytes, dict[str, Any]] = {}
 
     def store_credential(
         self,
         username: str,
         credential_id: bytes,
-        public_key: bytes,
+        credential_data: AttestedCredentialData,
         sign_count: int,
     ) -> None:
-        """Store a credential for a user."""
-        if username not in self._credentials:
-            self._credentials[username] = []
-        self._credentials[username].append(
-            {
-                "credential_id": credential_id,
-                "public_key": public_key,
-                "sign_count": sign_count,
-            }
-        )
+        """Store a credential, keyed by credential_id for direct lookup."""
+        self._credentials[credential_id] = {
+            "credential_id": credential_id,
+            "credential_data": credential_data,
+            "sign_count": sign_count,
+            "username": username,
+        }
 
     def get_credentials(self, username: str) -> list[dict[str, Any]]:
         """Return list of credential dicts for a user."""
-        return self._credentials.get(username, [])
+        return [c for c in self._credentials.values() if c["username"] == username]
 
-    def get_attested_credentials(self, username: str) -> list[AttestedCredentialData]:
-        """Return list of AttestedCredentialData for py-fido2 operations."""
-        result = []
-        for cred in self._credentials.get(username, []):
-            acd = AttestedCredentialData.create(
-                aaguid=b"\x00" * 16,
-                credential_id=cred["credential_id"],
-                public_key=cred["public_key"],
-            )
-            result.append(acd)
-        return result
+    def get_credential_by_id(self, credential_id: bytes) -> dict[str, Any] | None:
+        """Return a single credential by its ID."""
+        return self._credentials.get(credential_id)
+
+    def delete_credential(self, username: str, credential_id: bytes) -> bool:
+        """Remove a credential. Returns True if found and removed."""
+        cred = self._credentials.get(credential_id)
+        if cred is None or cred["username"] != username:
+            return False
+        del self._credentials[credential_id]
+        return True
 
     def update_sign_count(self, credential_id: bytes, new_count: int) -> None:
         """Update the sign count for a credential."""
-        for creds in self._credentials.values():
-            for cred in creds:
-                if cred["credential_id"] == credential_id:
-                    cred["sign_count"] = new_count
-                    return
+        cred = self._credentials.get(credential_id)
+        if cred is not None:
+            cred["sign_count"] = new_count
 
     def create_challenge_token(self, state_dict: dict[str, Any]) -> str:
         """Create a JWT-based challenge token encoding the state."""
@@ -101,15 +95,26 @@ class FidoService:
         return self._server.register_complete(state, response)
 
     def authenticate_begin(self, username: str) -> tuple[Any, Any]:
-        """Begin FIDO2 authentication. Returns (options, state)."""
-        credentials = self.get_attested_credentials(username)
+        """Begin FIDO2 authentication. Returns (options, state).
+
+        Passes all user's credential_data objects so the browser gets the full
+        allowCredentials list and the user can pick any registered passkey.
+        """
+        credentials = [c["credential_data"] for c in self.get_credentials(username)]
         return self._server.authenticate_begin(credentials)
 
     def authenticate_complete(
         self,
         state: Any,
-        credentials: list[AttestedCredentialData],
+        credential_id: bytes,
         response: Any,
     ) -> Any:
-        """Complete FIDO2 authentication. Returns credential result."""
-        return self._server.authenticate_complete(state, credentials, response)
+        """Complete FIDO2 authentication.
+
+        Looks up the specific credential used (from assertion's rawId) and verifies
+        only against that one — not the full list.
+        """
+        cred = self.get_credential_by_id(credential_id)
+        if cred is None:
+            raise ValueError("Unknown credential")
+        return self._server.authenticate_complete(state, [cred["credential_data"]], response)
