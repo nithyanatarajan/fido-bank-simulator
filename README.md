@@ -112,3 +112,7 @@ Edit `env.sample` to configure the application:
 | `RP_ORIGIN` | `http://localhost:9090` | WebAuthn expected origin |
 | `JWT_SECRET` | `change-me-in-production` | Secret for challenge tokens |
 | `JWT_EXPIRY_SECONDS` | `300` | Challenge token expiry |
+
+## License
+
+[MIT](LICENSE)
