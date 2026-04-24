@@ -53,42 +53,38 @@ tasks:
     cmds:
       - pnpm exec playwright test
 
-  lint:
-    desc: Lint all code
+  check:
+    desc: Check all code (lint + format) without modifying
     cmds:
-      - task: lint:backend
-      - task: lint:frontend
+      - task: check:backend
+      - task: check:frontend
 
-  lint:backend:
-    desc: Lint Python code
+  check:backend:
+    desc: Check Python code (lint + format)
     cmds:
       - cd backend && uv run ruff check app/ ../tests/app/
+      - cd backend && uv run ruff format --check app/ ../tests/app/
 
-  lint:frontend:
-    desc: Lint JavaScript code
+  check:frontend:
+    desc: Check JavaScript code (lint + format)
     dir: frontend
     cmds:
-      - pnpm exec eslint src/
+      - pnpm run check
 
-  format:
-    desc: Format all code
+  fix:
+    desc: Fix all code (lint + format)
     cmds:
-      - task: format:backend
-      - task: format:frontend
+      - task: fix:backend
+      - task: fix:frontend
 
-  format:backend:
-    desc: Format Python code
+  fix:backend:
+    desc: Fix Python code (lint + format)
     cmds:
+      - cd backend && uv run ruff check --fix app/ ../tests/app/
       - cd backend && uv run ruff format app/ ../tests/app/
 
-  format:frontend:
-    desc: Format JavaScript code
+  fix:frontend:
+    desc: Fix JavaScript code (lint + format)
     dir: frontend
     cmds:
-      - pnpm exec prettier --write 'src/**/*.{js,html,css}'
-
-  format:check:
-    desc: Check formatting without modifying files
-    cmds:
-      - cd backend && uv run ruff format --check app/ ../tests/app/
-      - cd frontend && pnpm exec prettier --check 'src/**/*.{js,html,css}'
+      - pnpm run fix
