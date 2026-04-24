@@ -33,12 +33,19 @@ tasks:
     desc: Run all tests
     cmds:
       - task: test:backend
+      - task: test:frontend
       - task: test:e2e
 
   test:backend:
     desc: Run Python backend tests
     cmds:
       - cd backend && uv run pytest ../tests/app/ -v
+
+  test:frontend:
+    desc: Run frontend unit tests
+    dir: frontend
+    cmds:
+      - npm run test
 
   test:e2e:
     desc: Run Playwright E2E tests
