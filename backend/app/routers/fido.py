@@ -22,7 +22,10 @@ def _get_username_or_401(session: str | None) -> str | JSONResponse:
     """Extract username from session cookie, or return 401 response."""
     if session is None or session_manager is None:
         return JSONResponse(status_code=401, content={"message": "Not authenticated"})
-    username = session_manager.verify_token(session)
+    # Import session_max_age from users module to share the same expiry
+    from app.routers.users import session_max_age
+
+    username = session_manager.verify_token(session, max_age=session_max_age)
     if username is None:
         return JSONResponse(status_code=401, content={"message": "Invalid session"})
     return username

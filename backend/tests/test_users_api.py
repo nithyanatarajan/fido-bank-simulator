@@ -2,6 +2,8 @@
 
 from app.main import app
 from app.routers import users as users_module
+from app.services.session import SessionManager
+from app.services.user_store import UserStore
 from starlette.testclient import TestClient
 
 
@@ -10,9 +12,9 @@ class TestUsersAPI:
 
     def setup_method(self) -> None:
         """Reset the user store before each test."""
-        from app.services.user_store import UserStore
-
         users_module.user_store = UserStore()
+        users_module.session_manager = SessionManager(secret="test-secret")
+        users_module.session_max_age = 3600
         self.client = TestClient(app)
 
     def test_register_success(self) -> None:
@@ -30,6 +32,13 @@ class TestUsersAPI:
         resp = self.client.post("/users/login", json={"username": "alice", "password": "pass123"})
         assert resp.status_code == 200
         assert "session" in resp.cookies
+
+    def test_login_sets_cookie_max_age(self) -> None:
+        self.client.post("/users/register", json={"username": "alice", "password": "pass123"})
+        resp = self.client.post("/users/login", json={"username": "alice", "password": "pass123"})
+        assert resp.status_code == 200
+        cookie_header = resp.headers.get("set-cookie", "")
+        assert "Max-Age=3600" in cookie_header
 
     def test_login_bad_credentials(self) -> None:
         self.client.post("/users/register", json={"username": "alice", "password": "pass123"})
