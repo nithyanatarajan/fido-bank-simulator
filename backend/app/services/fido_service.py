@@ -23,11 +23,12 @@ class FidoService:
         rp_origin: str,
         jwt_secret: str,
         jwt_expiry_seconds: int = 300,
+        additional_origins: list[str] | None = None,
     ) -> None:
         rp = PublicKeyCredentialRpEntity(name=rp_name, id=rp_id)
         allowed_origins = {rp_origin}
-        if "localhost" in rp_origin:
-            allowed_origins.add("http://localhost:5173")
+        if additional_origins:
+            allowed_origins.update(additional_origins)
         self._server = Fido2Server(rp, verify_origin=lambda o: o in allowed_origins)
         self._jwt_secret = jwt_secret
         self._jwt_expiry_seconds = jwt_expiry_seconds

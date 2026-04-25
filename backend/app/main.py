@@ -44,6 +44,7 @@ fido_service = FidoService(
     rp_origin=settings.rp_origin,
     jwt_secret=settings.jwt_secret,
     jwt_expiry_seconds=settings.jwt_expiry_seconds,
+    additional_origins=settings.cors_origin_list or None,
 )
 
 users.user_store = user_store
