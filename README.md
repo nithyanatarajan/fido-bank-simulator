@@ -23,16 +23,16 @@ Browser (SPA)  <-->  Vite dev proxy (:5173)  <-->  FastAPI (:9090)
 - Node.js 20+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - [pnpm](https://pnpm.io/) (Node package manager)
-- [Task](https://taskfile.dev/) runner (optional but recommended)
+- GNU Make
 
 ## Quick start
 
 ```bash
 # Install all dependencies
-task install
+make install
 
 # Start backend + frontend dev servers
-task dev
+make dev
 ```
 
 Or manually:
@@ -46,47 +46,48 @@ cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 9090 --reload
 cd frontend && pnpm install && pnpm dev
 ```
 
-Open http://localhost:5173 (Vite dev server) or http://localhost:9090 (production build).
+Open http://localhost:5173 (Vite dev server).
 
 ## Running tests
 
 ```bash
 # All tests (backend + frontend + E2E)
-task test
+make test
 
 # Backend unit tests
-task test:backend
+make test-backend
 
 # Frontend unit tests
-task test:frontend
+make test-frontend
 
 # E2E tests (starts servers automatically)
-task test:e2e
+make test-e2e
 ```
 
 ## Code quality
 
 ```bash
 # Check all (lint + format) — no modifications
-task check
+make check
 
 # Fix all (lint + format)
-task fix
+make fix
 
-# Check/fix backend only
-task check:backend
-task fix:backend
+# Backend only
+make check-backend
+make fix-backend
 
-# Check/fix frontend only
-task check:frontend    # or: cd frontend && pnpm run check
-task fix:frontend      # or: cd frontend && pnpm run fix
+# Frontend only
+make check-frontend    # or: cd frontend && pnpm run check
+make fix-frontend      # or: cd frontend && pnpm run fix
 ```
 
 ## Docker
 
 ```bash
 docker compose up --build
-# Access at http://localhost:9090
+# Frontend at http://localhost (nginx)
+# Backend API internal on port 9090
 ```
 
 ## CI pipeline
