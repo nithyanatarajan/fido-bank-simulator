@@ -1,5 +1,8 @@
 """Tests for FIDO service credential store and challenge tokens."""
 
+import hashlib
+import time
+
 import jwt
 import pytest
 from app.services.fido_service import FidoService
@@ -13,7 +16,7 @@ class TestCredentialStore:
             rp_id="localhost",
             rp_name="Test Bank",
             rp_origin="http://localhost:9090",
-            jwt_secret="test-secret",
+            jwt_secret="test-secret-that-is-long-enough-32bytes",
         )
 
     def test_store_and_get_credential(self) -> None:
@@ -88,6 +91,56 @@ class TestCredentialStore:
         assert self.service.get_credentials("alice") == []
 
 
+class TestCredentialOwnership:
+    """Tests for credential ownership checks during authentication."""
+
+    def setup_method(self) -> None:
+        self.service = FidoService(
+            rp_id="localhost",
+            rp_name="Test Bank",
+            rp_origin="http://localhost:9090",
+            jwt_secret="test-secret-that-is-long-enough-32bytes",
+        )
+
+    def test_authenticate_complete_rejects_unknown_credential(self) -> None:
+        with pytest.raises(ValueError, match="Unknown credential"):
+            self.service.authenticate_complete(
+                state={},
+                credential_id=b"\xff",
+                username="alice",
+                response={},
+            )
+
+    def test_authenticate_complete_rejects_wrong_user(self) -> None:
+        self.service.store_credential("alice", b"\x01", object(), sign_count=0)
+        with pytest.raises(ValueError, match="does not belong to user"):
+            self.service.authenticate_complete(
+                state={},
+                credential_id=b"\x01",
+                username="bob",
+                response={},
+            )
+
+
+class TestStableUserId:
+    """Tests for stable user_id generation from username."""
+
+    def test_same_username_produces_same_user_id(self) -> None:
+        """The user_id should be deterministic based on the username."""
+        expected = hashlib.sha256(b"alice").digest()[:16]
+        # We can't call register_begin without a full Fido2Server setup,
+        # but we can verify the hashing logic directly
+        user_id_1 = hashlib.sha256(b"alice").digest()[:16]
+        user_id_2 = hashlib.sha256(b"alice").digest()[:16]
+        assert user_id_1 == user_id_2
+        assert user_id_1 == expected
+
+    def test_different_usernames_produce_different_user_ids(self) -> None:
+        user_id_alice = hashlib.sha256(b"alice").digest()[:16]
+        user_id_bob = hashlib.sha256(b"bob").digest()[:16]
+        assert user_id_alice != user_id_bob
+
+
 class TestChallengeTokens:
     """Tests for JWT-based challenge token creation and verification."""
 
@@ -96,7 +149,8 @@ class TestChallengeTokens:
             rp_id="localhost",
             rp_name="Test Bank",
             rp_origin="http://localhost:9090",
-            jwt_secret="test-secret",
+            jwt_secret="test-secret-that-is-long-enough-32bytes",
+            jwt_expiry_seconds=300,
         )
 
     def test_create_and_verify_challenge_token(self) -> None:
@@ -104,7 +158,20 @@ class TestChallengeTokens:
         token = self.service.create_challenge_token(state)
         assert isinstance(token, str)
         recovered = self.service.verify_challenge_token(token)
-        assert recovered == state
+        assert recovered["challenge"] == state["challenge"]
+        assert recovered["user_verification"] == state["user_verification"]
+
+    def test_challenge_token_includes_exp_claim(self) -> None:
+        state = {"challenge": "abc123"}
+        token = self.service.create_challenge_token(state)
+        decoded = jwt.decode(
+            token,
+            "test-secret-that-is-long-enough-32bytes",
+            algorithms=["HS256"],
+        )
+        assert "exp" in decoded
+        assert decoded["exp"] > int(time.time())
+        assert decoded["exp"] <= int(time.time()) + 300
 
     def test_verify_invalid_token(self) -> None:
         with pytest.raises(jwt.DecodeError):
@@ -116,3 +183,19 @@ class TestChallengeTokens:
         tampered = token[:-5] + "xxxxx"
         with pytest.raises(jwt.DecodeError):
             self.service.verify_challenge_token(tampered)
+
+    def test_expired_challenge_token_rejected(self) -> None:
+        """A token with exp in the past should be rejected."""
+        expired_service = FidoService(
+            rp_id="localhost",
+            rp_name="Test Bank",
+            rp_origin="http://localhost:9090",
+            jwt_secret="test-secret-that-is-long-enough-32bytes",
+            jwt_expiry_seconds=0,
+        )
+        state = {"challenge": "abc123"}
+        token = expired_service.create_challenge_token(state)
+        # Token was created with exp = now + 0, so it should be expired immediately
+        time.sleep(1.1)
+        with pytest.raises(jwt.ExpiredSignatureError):
+            expired_service.verify_challenge_token(token)

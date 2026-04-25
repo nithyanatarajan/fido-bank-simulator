@@ -1,7 +1,6 @@
 """FIDO2 WebAuthn registration and credential endpoints."""
 
 import base64
-import os
 from typing import Any
 
 from fastapi import APIRouter, Cookie
@@ -60,8 +59,7 @@ def register_begin(session: str | None = Cookie(default=None)) -> dict[str, Any]
         return result
     username = result
 
-    user_id = os.urandom(16)
-    options, state = fido_service.register_begin(username, user_id)
+    options, state = fido_service.register_begin(username)
     challenge_token = fido_service.create_challenge_token(state)
 
     serialized = _serialize_public_key(dict(options))
@@ -87,7 +85,8 @@ def register_complete(
         state = fido_service.verify_challenge_token(req.challenge_token)
         auth_data = fido_service.register_complete(state, req.attestation)
         cred_data = auth_data.credential_data
-        assert cred_data is not None
+        if cred_data is None:
+            return JSONResponse(status_code=400, content={"message": "Missing credential data"})
         fido_service.store_credential(
             username=username,
             credential_id=cred_data.credential_id,
@@ -95,8 +94,10 @@ def register_complete(
             sign_count=auth_data.counter,
         )
         return {"status": "ok"}
-    except Exception as e:
+    except (ValueError, KeyError) as e:
         return JSONResponse(status_code=400, content={"message": str(e)})
+    except Exception:
+        return JSONResponse(status_code=500, content={"message": "Internal server error"})
 
 
 @router.get("/credentials", response_model=None)
@@ -174,15 +175,27 @@ def auth_complete(
     result = _get_username_or_401(session)
     if isinstance(result, JSONResponse):
         return result
-    _username = result  # auth check passed; credential lookup is by ID
+    username = result
 
     try:
         state = fido_service.verify_challenge_token(req.challenge_token)
         # Look up the specific credential used from the assertion's rawId
         padded = req.assertion["rawId"] + "=" * (-len(req.assertion["rawId"]) % 4)
         credential_id = base64.urlsafe_b64decode(padded)
-        fido_service.authenticate_complete(state, credential_id, req.assertion)
-        fido_service.update_sign_count(credential_id, 0)
+        fido_service.authenticate_complete(state, credential_id, username, req.assertion)
+
+        # Extract sign count from authenticator data
+        auth_data_b64 = req.assertion.get("response", {}).get("authenticatorData", "")
+        if auth_data_b64:
+            auth_data_padded = auth_data_b64 + "=" * (-len(auth_data_b64) % 4)
+            auth_data_bytes = base64.urlsafe_b64decode(auth_data_padded)
+            # Sign count is bytes 33-36 (big-endian uint32) in authenticator data
+            if len(auth_data_bytes) >= 37:
+                new_sign_count = int.from_bytes(auth_data_bytes[33:37], "big")
+                fido_service.update_sign_count(credential_id, new_sign_count)
+
         return {"status": "ok"}
-    except Exception as e:
+    except (ValueError, KeyError) as e:
         return JSONResponse(status_code=400, content={"message": str(e)})
+    except Exception:
+        return JSONResponse(status_code=500, content={"message": "Internal server error"})

@@ -1,5 +1,7 @@
 """FIDO2/WebAuthn service using py-fido2 with in-memory credential storage."""
 
+import hashlib
+import time
 from typing import Any
 
 import jwt
@@ -70,8 +72,9 @@ class FidoService:
             cred["sign_count"] = new_count
 
     def create_challenge_token(self, state_dict: dict[str, Any]) -> str:
-        """Create a JWT-based challenge token encoding the state."""
-        return jwt.encode(state_dict, self._jwt_secret, algorithm="HS256")
+        """Create a JWT-based challenge token encoding the state with expiry."""
+        payload = {**state_dict, "exp": int(time.time()) + self._jwt_expiry_seconds}
+        return jwt.encode(payload, self._jwt_secret, algorithm="HS256")
 
     def verify_challenge_token(self, token: str) -> dict[str, Any]:
         """Verify and decode a challenge token. Raises on invalid/expired."""
@@ -80,9 +83,13 @@ class FidoService:
     def register_begin(
         self,
         username: str,
-        user_id: bytes,
     ) -> tuple[Any, Any]:
-        """Begin FIDO2 registration. Returns (options, state)."""
+        """Begin FIDO2 registration. Returns (options, state).
+
+        Uses a stable user_id derived from the username hash so the same user
+        always gets the same WebAuthn user handle across registrations.
+        """
+        user_id = hashlib.sha256(username.encode()).digest()[:16]
         user = PublicKeyCredentialUserEntity(
             name=username,
             id=user_id,
@@ -107,14 +114,17 @@ class FidoService:
         self,
         state: Any,
         credential_id: bytes,
+        username: str,
         response: Any,
     ) -> Any:
         """Complete FIDO2 authentication.
 
-        Looks up the specific credential used (from assertion's rawId) and verifies
-        only against that one -- not the full list.
+        Looks up the specific credential used (from assertion's rawId), verifies
+        ownership by username, and authenticates against that credential only.
         """
         cred = self.get_credential_by_id(credential_id)
         if cred is None:
             raise ValueError("Unknown credential")
+        if cred["username"] != username:
+            raise ValueError("Credential does not belong to user")
         return self._server.authenticate_complete(state, [cred["credential_data"]], response)
