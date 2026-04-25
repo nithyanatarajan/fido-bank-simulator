@@ -68,3 +68,16 @@ class TestUsersAPI:
     def test_me_unauthenticated(self) -> None:
         resp = self.client.get("/users/me")
         assert resp.status_code == 401
+
+    def test_me_returns_401_when_user_no_longer_in_store(self) -> None:
+        """Simulates server restart — session cookie valid but user store is empty."""
+        self.client.post("/users/register", json={"username": "alice", "password": "pass123"})
+        self.client.post("/users/login", json={"username": "alice", "password": "pass123"})
+        # Verify session works
+        resp = self.client.get("/users/me")
+        assert resp.status_code == 200
+        # Clear the store (simulates restart)
+        users_module.user_store = UserStore()
+        resp = self.client.get("/users/me")
+        assert resp.status_code == 401
+        assert resp.json()["message"] == "User not found"

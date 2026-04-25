@@ -55,9 +55,12 @@ def logout(response: Response) -> MessageResponse:
 def me(session: str | None = Cookie(default=None)) -> UserResponse | JSONResponse:
     """Return current user from session cookie."""
     assert session_manager is not None
+    assert user_store is not None
     if session is None:
         return JSONResponse(status_code=401, content={"message": "Not authenticated"})
     username = session_manager.verify_token(session, max_age=session_max_age)
     if username is None:
         return JSONResponse(status_code=401, content={"message": "Invalid session"})
+    if not user_store.exists(username):
+        return JSONResponse(status_code=401, content={"message": "User not found"})
     return UserResponse(username=username)
