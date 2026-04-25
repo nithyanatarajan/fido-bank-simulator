@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 30000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.TEST_URL || 'http://localhost:5173',
     headless: true,
   },
   projects: [
@@ -15,16 +15,18 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  webServer: [
-    {
-      command: 'cd ../../backend && uv run uvicorn app.main:app --port 9090',
-      port: 9090,
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: 'cd ../../frontend && pnpm dev',
-      port: 5173,
-      reuseExistingServer: !process.env.CI,
-    },
-  ],
+  webServer: process.env.TEST_URL
+    ? []
+    : [
+        {
+          command: 'cd ../../backend && uv run uvicorn app.main:app --port 9090',
+          port: 9090,
+          reuseExistingServer: !process.env.CI,
+        },
+        {
+          command: 'cd ../../frontend && pnpm dev',
+          port: 5173,
+          reuseExistingServer: !process.env.CI,
+        },
+      ],
 });
