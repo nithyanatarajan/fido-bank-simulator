@@ -1,7 +1,7 @@
 /**
  * Dashboard page showing user info, passkeys, and banking actions.
  */
-import { logout } from '../api.js';
+import { getApiUrl, logout } from '../api.js';
 import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
 /**
@@ -15,7 +15,7 @@ function escapeAttr(str) {
 
 async function loadPasskeys(listEl, onDelete) {
   try {
-    const resp = await fetch('/fido/credentials');
+    const resp = await fetch(`${getApiUrl()}/fido/credentials`, { credentials: 'include' });
     if (!resp.ok) return;
     const data = await resp.json();
     const creds = data.credentials || [];
@@ -155,8 +155,9 @@ export function renderDashboard(container, username, onLogout) {
 
   async function handleDeletePasskey(credentialId) {
     try {
-      const resp = await fetch(`/fido/credentials/${escapeAttr(credentialId)}`, {
+      const resp = await fetch(`${getApiUrl()}/fido/credentials/${escapeAttr(credentialId)}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       if (!resp.ok) {
         const data = await resp.json();
@@ -193,7 +194,10 @@ export function renderDashboard(container, username, onLogout) {
     transferMsg.textContent = '';
     transferMsg.className = 'mt-2 small';
     try {
-      const resp = await fetch('/transfer', { method: 'POST' });
+      const resp = await fetch(`${getApiUrl()}/transfer`, {
+        method: 'POST',
+        credentials: 'include',
+      });
       if (!resp.ok) {
         const data = await resp.json();
         throw new Error(data.message || 'Transfer failed');

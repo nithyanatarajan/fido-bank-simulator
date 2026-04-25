@@ -9,7 +9,7 @@ export default defineConfig({
       '/transfer': 'http://localhost:9090',
       '/risk': 'http://localhost:9090',
       '/health': 'http://localhost:9090',
-      '/config': 'http://localhost:9090',
+      '/config/stepup': 'http://localhost:9090',
     },
   },
   build: {

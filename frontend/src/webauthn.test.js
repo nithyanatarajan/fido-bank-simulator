@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('./api.js', () => ({
+  getApiUrl: vi.fn(() => ''),
+}));
+
 import { base64urlToBuffer, bufferToBase64url } from './webauthn.js';
 
 describe('base64urlToBuffer', () => {

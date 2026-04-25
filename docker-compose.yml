@@ -12,13 +12,17 @@ services:
       - RP_ORIGIN=http://localhost
       - JWT_SECRET=change-me-in-production
       - JWT_EXPIRY_SECONDS=300
-    expose:
-      - "9090"
+      - CORS_ORIGINS=http://localhost
+      - SESSION_MAX_AGE_SECONDS=3600
+    ports:
+      - "9090:9090"
 
   frontend:
     build:
       context: frontend
       dockerfile: Dockerfile
+    environment:
+      - API_URL=http://localhost:9090
     ports:
       - "80:80"
     depends_on:

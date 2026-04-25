@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-RUN groupadd --gid 1000 app && useradd --uid 1000 --gid app --shell /bin/bash app
+RUN groupadd --gid 1000 app && useradd --uid 1000 --gid app --create-home --shell /bin/bash app
 
 WORKDIR /app
 
@@ -11,8 +11,10 @@ RUN uv sync --frozen --no-dev
 
 COPY backend/ ./backend/
 
-RUN chown -R app:app /app
+RUN chown -R app:app /app /home/app
 USER app
+
+ENV UV_CACHE_DIR=/home/app/.cache/uv
 
 WORKDIR /app/backend
 

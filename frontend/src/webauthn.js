@@ -1,6 +1,7 @@
 /**
  * WebAuthn helper functions for passkey registration and authentication.
  */
+import { getApiUrl } from './api.js';
 
 /**
  * Convert a base64url string to an ArrayBuffer.
@@ -37,8 +38,13 @@ export function bufferToBase64url(buffer) {
  * @returns {Promise<void>}
  */
 export async function registerPasskey() {
+  const api = getApiUrl();
+
   // Step 1: Get registration options from server
-  const beginResp = await fetch('/fido/register/begin', { method: 'POST' });
+  const beginResp = await fetch(`${api}/fido/register/begin`, {
+    method: 'POST',
+    credentials: 'include',
+  });
   if (!beginResp.ok) {
     const data = await beginResp.json();
     throw new Error(data.message || 'Failed to begin registration');
@@ -77,9 +83,10 @@ export async function registerPasskey() {
   };
 
   // Step 5: Complete registration on server
-  const completeResp = await fetch('/fido/register/complete', {
+  const completeResp = await fetch(`${api}/fido/register/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ challenge_token, attestation }),
   });
   if (!completeResp.ok) {
@@ -93,8 +100,13 @@ export async function registerPasskey() {
  * @returns {Promise<void>}
  */
 export async function authenticatePasskey() {
+  const api = getApiUrl();
+
   // Step 1: Get authentication options from server
-  const beginResp = await fetch('/fido/auth/begin', { method: 'POST' });
+  const beginResp = await fetch(`${api}/fido/auth/begin`, {
+    method: 'POST',
+    credentials: 'include',
+  });
   if (!beginResp.ok) {
     const data = await beginResp.json();
     throw new Error(data.message || 'Failed to begin authentication');
@@ -133,9 +145,10 @@ export async function authenticatePasskey() {
   };
 
   // Step 5: Complete authentication on server
-  const completeResp = await fetch('/fido/auth/complete', {
+  const completeResp = await fetch(`${api}/fido/auth/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ challenge_token, assertion: assertionData }),
   });
   if (!completeResp.ok) {
