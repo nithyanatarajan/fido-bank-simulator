@@ -4,6 +4,15 @@
 import { logout } from '../api.js';
 import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
+/**
+ * Escape a string for safe insertion into HTML attributes.
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeAttr(str) {
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 async function loadPasskeys(listEl, onDelete) {
   try {
     const resp = await fetch('/fido/credentials');
@@ -19,25 +28,43 @@ async function loadPasskeys(listEl, onDelete) {
         </div>
       `;
     } else {
-      listEl.innerHTML = creds
-        .map(
-          (c, i) => `
-          <li class="list-group-item d-flex justify-content-between align-items-center" data-testid="passkey-item">
-            <div class="passkey-item">
-              <span class="passkey-icon">&#128273;</span>
-              <div>
-                <div class="fw-medium">Passkey ${i + 1}</div>
-                <small class="text-muted">${c.credential_id.substring(0, 20)}...</small>
-              </div>
-            </div>
-            <button class="btn btn-outline-danger btn-sm" data-testid="delete-passkey-btn"
-                    data-credential-id="${c.credential_id}">&#10005;</button>
-          </li>`,
-        )
-        .join('');
+      // Build passkey list items using DOM API to avoid XSS
+      listEl.innerHTML = '';
+      creds.forEach((c, i) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.setAttribute('data-testid', 'passkey-item');
 
-      listEl.querySelectorAll('[data-testid="delete-passkey-btn"]').forEach((btn) => {
-        btn.addEventListener('click', () => onDelete(btn.dataset.credentialId));
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'passkey-item';
+
+        const icon = document.createElement('span');
+        icon.className = 'passkey-icon';
+        icon.textContent = '\u{1F511}';
+
+        const infoDiv = document.createElement('div');
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'fw-medium';
+        nameDiv.textContent = `Passkey ${i + 1}`;
+        const idSmall = document.createElement('small');
+        idSmall.className = 'text-muted';
+        idSmall.textContent = `${c.credential_id.substring(0, 20)}...`;
+        infoDiv.appendChild(nameDiv);
+        infoDiv.appendChild(idSmall);
+
+        itemDiv.appendChild(icon);
+        itemDiv.appendChild(infoDiv);
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline-danger btn-sm';
+        btn.setAttribute('data-testid', 'delete-passkey-btn');
+        btn.setAttribute('data-credential-id', c.credential_id);
+        btn.textContent = '\u2715';
+        btn.addEventListener('click', () => onDelete(c.credential_id));
+
+        li.appendChild(itemDiv);
+        li.appendChild(btn);
+        listEl.appendChild(li);
       });
     }
   } catch {
@@ -46,12 +73,13 @@ async function loadPasskeys(listEl, onDelete) {
 }
 
 export function renderDashboard(container, username, onLogout) {
+  // Build the static shell without user data in innerHTML
   container.innerHTML = `
     <nav class="navbar navbar-expand navbar-dark bg-dark">
       <div class="container">
         <span class="navbar-brand">SimpleFIDO Demo Bank</span>
         <div class="d-flex align-items-center gap-3">
-          <span class="text-light small" data-testid="welcome-user">${username}</span>
+          <span class="text-light small" data-testid="welcome-user" id="welcome-user"></span>
           <button class="btn btn-outline-light btn-sm" data-testid="logout-btn" id="logout-btn">
             Logout
           </button>
@@ -115,6 +143,9 @@ export function renderDashboard(container, username, onLogout) {
     </div>
   `;
 
+  // Set username via textContent to prevent XSS
+  container.querySelector('#welcome-user').textContent = username;
+
   const passkeyList = container.querySelector('#passkey-list');
   const passkeyMsg = container.querySelector('#passkey-message');
   const transferMsg = container.querySelector('#transfer-message');
@@ -124,7 +155,9 @@ export function renderDashboard(container, username, onLogout) {
 
   async function handleDeletePasskey(credentialId) {
     try {
-      const resp = await fetch(`/fido/credentials/${credentialId}`, { method: 'DELETE' });
+      const resp = await fetch(`/fido/credentials/${escapeAttr(credentialId)}`, {
+        method: 'DELETE',
+      });
       if (!resp.ok) {
         const data = await resp.json();
         throw new Error(data.message || 'Delete failed');
