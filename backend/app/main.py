@@ -1,7 +1,4 @@
-from pathlib import Path
-
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.routers import banking, fido, users
@@ -34,7 +31,3 @@ banking.fido_stepup_enabled = settings.fido_stepup_enabled
 app.include_router(banking.router)
 app.include_router(users.router)
 app.include_router(fido.router)
-
-static_dir = Path(__file__).parent.parent.parent / "static"
-if static_dir.exists():
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
