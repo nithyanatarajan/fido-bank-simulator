@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -21,9 +23,38 @@ def _validate_settings() -> None:
         raise ValueError(f"Required settings are empty: {', '.join(missing)}")
 
 
-_validate_settings()
+def _wire_singletons() -> None:
+    """Create singletons and wire them into routers."""
+    user_store = UserStore()
+    session_manager = SessionManager(secret=settings.jwt_secret)
+    fido_service = FidoService(
+        rp_id=settings.rp_id,
+        rp_name=settings.rp_name,
+        rp_origin=settings.rp_origin,
+        jwt_secret=settings.jwt_secret,
+        jwt_expiry_seconds=settings.jwt_expiry_seconds,
+        additional_origins=settings.cors_origin_list or None,
+    )
 
-app = FastAPI(title="FIDO Bank Simulator")
+    users.user_store = user_store
+    users.session_manager = session_manager
+    users.session_max_age = settings.session_max_age_seconds
+
+    fido.fido_service = fido_service
+    fido.session_manager = session_manager
+
+    banking.session_manager = session_manager
+    banking.fido_stepup_enabled = settings.fido_stepup_enabled
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    _validate_settings()
+    _wire_singletons()
+    yield
+
+
+app = FastAPI(title="FIDO Bank Simulator", lifespan=lifespan)
 
 # CORS middleware — only added when origins are configured
 if settings.cors_origin_list:
@@ -34,28 +65,6 @@ if settings.cors_origin_list:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-# Create singletons and wire into routers
-user_store = UserStore()
-session_manager = SessionManager(secret=settings.jwt_secret)
-fido_service = FidoService(
-    rp_id=settings.rp_id,
-    rp_name=settings.rp_name,
-    rp_origin=settings.rp_origin,
-    jwt_secret=settings.jwt_secret,
-    jwt_expiry_seconds=settings.jwt_expiry_seconds,
-    additional_origins=settings.cors_origin_list or None,
-)
-
-users.user_store = user_store
-users.session_manager = session_manager
-users.session_max_age = settings.session_max_age_seconds
-
-fido.fido_service = fido_service
-fido.session_manager = session_manager
-
-banking.session_manager = session_manager
-banking.fido_stepup_enabled = settings.fido_stepup_enabled
 
 app.include_router(banking.router)
 app.include_router(users.router)

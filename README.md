@@ -44,6 +44,10 @@ In Docker, frontend and backend run as separate containers. The frontend injects
 # Install all dependencies
 make install
 
+# Create local config from templates
+cp backend/env.sample backend/.env
+# Edit backend/.env with your local values
+
 # Start backend + frontend dev servers
 make dev
 ```
@@ -116,7 +120,11 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and PR to mast
 
 ## Configuration
 
-Edit `env.sample` to configure the application:
+Copy `backend/env.sample` to `backend/.env` and edit:
+
+```bash
+cp backend/env.sample backend/.env
+```
 
 | Variable | Default | Description |
 |----------|---------|-------------|

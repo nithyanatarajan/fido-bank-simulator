@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     cors_origins: str = ""
     session_max_age_seconds: int = 3600
 
-    model_config = {"env_file": "../env.sample", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property
     def cors_origin_list(self) -> list[str]:
