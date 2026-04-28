@@ -128,6 +128,9 @@ jobs:
         working-directory: tests/e2e
         run: pnpm exec playwright install chromium --with-deps
 
+      - name: Create backend .env from template
+        run: cp backend/env.sample backend/.env
+
       - name: Build frontend
         working-directory: frontend
         run: pnpm build
