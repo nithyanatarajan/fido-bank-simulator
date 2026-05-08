@@ -33,7 +33,7 @@ In Docker, frontend and backend run as separate containers. The frontend injects
 ## Prerequisites
 
 - Python 3.12+
-- Node.js 20+
+- Node.js 22+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - [pnpm](https://pnpm.io/) (Node package manager)
 - GNU Make
