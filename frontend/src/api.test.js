@@ -18,7 +18,7 @@ describe('register', () => {
 
     const result = await register('alice', 'pass123');
 
-    expect(mockFetch).toHaveBeenCalledWith('/users/register', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'alice', password: 'pass123' }),
@@ -55,7 +55,7 @@ describe('login', () => {
 
     const result = await login('alice', 'pass123');
 
-    expect(mockFetch).toHaveBeenCalledWith('/users/login', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'alice', password: 'pass123' }),
@@ -75,7 +75,7 @@ describe('login', () => {
 });
 
 describe('logout', () => {
-  it('sends POST to /users/logout with credentials include', async () => {
+  it('sends POST to /api/users/logout with credentials include', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ message: 'Logged out' }),
@@ -83,7 +83,7 @@ describe('logout', () => {
 
     const result = await logout();
 
-    expect(mockFetch).toHaveBeenCalledWith('/users/logout', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/logout', {
       method: 'POST',
       credentials: 'include',
     });
@@ -100,7 +100,7 @@ describe('getMe', () => {
 
     const result = await getMe();
 
-    expect(mockFetch).toHaveBeenCalledWith('/users/me', {
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/me', {
       credentials: 'include',
     });
     expect(result).toEqual({ username: 'alice' });
@@ -110,25 +110,5 @@ describe('getMe', () => {
     mockFetch.mockResolvedValue({ ok: false });
 
     await expect(getMe()).rejects.toThrow('Not authenticated');
-  });
-});
-
-describe('apiUrl from config', () => {
-  it('prepends apiUrl when configured', async () => {
-    // Set up config
-    globalThis.window = { __CONFIG__: { apiUrl: 'http://api.example.com' } };
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ username: 'alice' }),
-    });
-
-    await getMe();
-
-    expect(mockFetch).toHaveBeenCalledWith('http://api.example.com/users/me', {
-      credentials: 'include',
-    });
-
-    // Clean up
-    delete globalThis.window;
   });
 });

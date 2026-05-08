@@ -2,11 +2,6 @@
  * API client for user endpoints.
  */
 
-/** @returns {string} Base URL for API calls (empty string for same-origin). */
-export function getApiUrl() {
-  return (typeof window !== 'undefined' && window.__CONFIG__?.apiUrl) || '';
-}
-
 /**
  * Register a new user.
  * @param {string} username
@@ -14,7 +9,7 @@ export function getApiUrl() {
  * @returns {Promise<{username: string}>}
  */
 export async function register(username, password) {
-  const resp = await fetch(`${getApiUrl()}/users/register`, {
+  const resp = await fetch('/api/users/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -34,7 +29,7 @@ export async function register(username, password) {
  * @returns {Promise<{message: string}>}
  */
 export async function login(username, password) {
-  const resp = await fetch(`${getApiUrl()}/users/login`, {
+  const resp = await fetch('/api/users/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -52,7 +47,7 @@ export async function login(username, password) {
  * @returns {Promise<{message: string}>}
  */
 export async function logout() {
-  const resp = await fetch(`${getApiUrl()}/users/logout`, {
+  const resp = await fetch('/api/users/logout', {
     method: 'POST',
     credentials: 'include',
   });
@@ -64,7 +59,7 @@ export async function logout() {
  * @returns {Promise<{username: string}>}
  */
 export async function getMe() {
-  const resp = await fetch(`${getApiUrl()}/users/me`, {
+  const resp = await fetch('/api/users/me', {
     credentials: 'include',
   });
   if (!resp.ok) {

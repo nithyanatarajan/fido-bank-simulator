@@ -1,7 +1,6 @@
 /**
  * WebAuthn helper functions for passkey registration and authentication.
  */
-import { getApiUrl } from './api.js';
 
 /**
  * Convert a base64url string to an ArrayBuffer.
@@ -38,10 +37,8 @@ export function bufferToBase64url(buffer) {
  * @returns {Promise<void>}
  */
 export async function registerPasskey() {
-  const api = getApiUrl();
-
   // Step 1: Get registration options from server
-  const beginResp = await fetch(`${api}/fido/register/begin`, {
+  const beginResp = await fetch('/api/fido/register/begin', {
     method: 'POST',
     credentials: 'include',
   });
@@ -83,7 +80,7 @@ export async function registerPasskey() {
   };
 
   // Step 5: Complete registration on server
-  const completeResp = await fetch(`${api}/fido/register/complete`, {
+  const completeResp = await fetch('/api/fido/register/complete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -100,10 +97,8 @@ export async function registerPasskey() {
  * @returns {Promise<void>}
  */
 export async function authenticatePasskey() {
-  const api = getApiUrl();
-
   // Step 1: Get authentication options from server
-  const beginResp = await fetch(`${api}/fido/auth/begin`, {
+  const beginResp = await fetch('/api/fido/auth/begin', {
     method: 'POST',
     credentials: 'include',
   });
@@ -145,7 +140,7 @@ export async function authenticatePasskey() {
   };
 
   // Step 5: Complete authentication on server
-  const completeResp = await fetch(`${api}/fido/auth/complete`, {
+  const completeResp = await fetch('/api/fido/auth/complete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
