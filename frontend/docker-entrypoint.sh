@@ -1,7 +1,5 @@
 #!/bin/sh
-# Inject runtime API_URL into config.js served by nginx
-cat > /usr/share/nginx/html/config.js <<EOF
-window.__CONFIG__ = { apiUrl: '${API_URL:-}' };
-EOF
+# Substitute API_URL into nginx config at container startup
+envsubst '${API_URL}' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/conf.d/default.conf
 
 exec nginx -g 'daemon off;'

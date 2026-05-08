@@ -22,7 +22,7 @@ services:
       context: frontend
       dockerfile: Dockerfile
     environment:
-      - API_URL=http://localhost:9090
+      - API_URL=http://backend:9090
     ports:
       - "80:80"
     depends_on:
