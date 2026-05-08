@@ -11,24 +11,61 @@ Users register and log in with username/password, then add passkeys (using the W
 - **Authentication**: Session cookies (itsdangerous timed tokens with configurable expiry) + FIDO2 passkeys (py-fido2)
 - **Step-up flow**: Transfer endpoint returns `step_up_required`, frontend triggers WebAuthn assertion
 
-### Dev mode (Vite proxy)
-
 ```
-Browser (SPA)  <-->  Vite dev proxy (:5173)  <-->  FastAPI (:9090)
-                                                      |
-                                              [UserStore, FidoService, SessionManager]
-```
-
-In dev mode, the Vite dev server proxies API requests to the backend. No CORS configuration is needed because the browser sees a single origin.
-
-### Docker (CORS, separate containers)
-
-```
-Browser  <-->  nginx (:80)     FastAPI (:9090)
-               (static SPA)    (API, CORS enabled)
+Browser → Proxy (Vite or nginx) → Backend (FastAPI)
+          ├── /api/*    → proxy to backend
+          ├── /healthz  → 200 OK (nginx only, local)
+          └── /*        → static files / SPA fallback
 ```
 
-In Docker, frontend and backend run as separate containers. The frontend injects `API_URL` at container startup via `config.js`, and the backend enables CORS for the configured origins. All fetch calls include `credentials: 'include'` for cross-origin cookies.
+The frontend always calls same-origin relative paths (e.g., `fetch('/api/users/login')`). The proxy layer — Vite in dev, nginx in production — routes `/api/*` requests to the backend. The frontend never knows the backend's actual address.
+
+## API URL Configuration
+
+The frontend and backend use a **single, unified approach** to API routing across all environments.
+
+### Development (Vite proxy)
+
+Vite dev server proxies `/api/*` to the backend:
+
+```sh
+# Default: proxies /api/* to http://localhost:9090
+cd frontend && pnpm dev
+
+# Custom backend address
+VITE_DEV_API_URL=http://localhost:8080 pnpm dev
+```
+
+`VITE_DEV_API_URL` is dev tooling config — it tells Vite where to forward requests. It is **not** baked into the frontend build.
+
+### Production (nginx reverse proxy)
+
+The nginx container uses a config template (`nginx.conf.template`) with an `API_URL` environment variable. At container startup, `envsubst` substitutes the variable into the nginx config before nginx starts.
+
+```sh
+# Docker Compose (see docker-compose.yml)
+docker compose up
+
+# Docker run
+docker run -e API_URL=http://backend:9090 -p 80:80 my-frontend
+
+# Azure Container Apps
+az containerapp update \
+  --name my-frontend \
+  --resource-group my-rg \
+  --set-env-vars API_URL=http://backend-app:9090
+```
+
+The same Docker image works across all environments — only the `API_URL` env var changes at runtime.
+
+### Summary
+
+| Environment | Proxy layer | Config mechanism | Backend address |
+|---|---|---|---|
+| Dev | Vite dev server | `VITE_DEV_API_URL` env var | `http://localhost:9090` (default) |
+| Production | nginx | `API_URL` env var via `envsubst` | Set at container startup |
+
+Both use the same pattern: a reverse proxy routes `/api/*` to the backend. The frontend code is identical in both cases — no build-time variables, no runtime JS config.
 
 ## Prerequisites
 
@@ -103,11 +140,15 @@ make fix-frontend      # or: cd frontend && pnpm run fix
 
 ```bash
 docker compose up --build
-# Frontend at http://localhost (nginx, port 80)
-# Backend API at http://localhost:9090 (exposed for CORS)
+# App at http://localhost (nginx proxies /api/* to backend)
 ```
 
-The frontend container runs `docker-entrypoint.sh` on startup to inject `API_URL` into `/config.js`. The backend enables CORS for origins listed in `CORS_ORIGINS`.
+The frontend container runs `docker-entrypoint.sh` on startup, which uses `envsubst` to inject `API_URL` into the nginx config template. Nginx then proxies `/api/*` requests to the backend.
+
+## Health Checks
+
+- **Frontend (nginx):** `GET /healthz` — returns `200 OK` locally, does not depend on backend
+- **Backend:** `GET /api/health` — returns `{"status": "ok"}`
 
 ## CI pipeline
 
@@ -118,7 +159,7 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and PR to mast
 3. **E2E tests** (Playwright, after unit tests)
 4. **Docker build** (after E2E)
 
-## Configuration
+## Backend Configuration
 
 Copy `backend/env.sample` to `backend/.env` and edit:
 
