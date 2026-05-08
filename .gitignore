@@ -1,14 +1,15 @@
-__pycache__/
-*.pyc
+# OS
+.DS_Store
+
+# Editors/IDEs
+.idea/
+.vscode/
+.aide.yaml
+
+# Secrets
 .env
 .env*
-.venv/
-venv/
-node_modules/
-dist/
+.env.*
+
+# Build output
 static/
-.pytest_cache/
-test-results/
-playwright-report/
-*.egg-info/
-.ruff_cache/
