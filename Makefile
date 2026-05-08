@@ -1,4 +1,4 @@
-.PHONY: install dev backend client build test test-backend test-frontend test-e2e check check-backend check-frontend fix fix-backend fix-frontend
+.PHONY: install dev backend client build test test-backend test-frontend test-e2e check check-backend check-frontend check-e2e fix fix-backend fix-frontend fix-e2e
 
 .DEFAULT_GOAL := help
 
@@ -38,23 +38,29 @@ test-e2e: ## Run Playwright E2E tests
 
 ## Code quality
 
-check: check-backend check-frontend ## Check all code (lint + format) without modifying
+check: check-backend check-frontend check-e2e ## Check all code (lint + format) without modifying
 
 check-backend: ## Check Python code (lint + format)
 	cd backend && uv run ruff check app/ tests/
 	cd backend && uv run ruff format --check app/ tests/
 
 check-frontend: ## Check JavaScript code (lint + format)
-	cd frontend && pnpm run check
+	cd frontend && pnpm check
 
-fix: fix-backend fix-frontend ## Fix all code (lint + format)
+check-e2e: ## Check E2E code (lint + format)
+	cd tests/e2e && pnpm check
+
+fix: fix-backend fix-frontend fix-e2e ## Fix all code (lint + format)
 
 fix-backend: ## Fix Python code (lint + format)
 	cd backend && uv run ruff check --fix app/ tests/
 	cd backend && uv run ruff format app/ tests/
 
 fix-frontend: ## Fix JavaScript code (lint + format)
-	cd frontend && pnpm run fix
+	cd frontend && pnpm fix
+
+fix-e2e: ## Fix E2E code (lint + format)
+	cd tests/e2e && pnpm fix
 
 ## Help
 

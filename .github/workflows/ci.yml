@@ -44,7 +44,15 @@ jobs:
 
       - name: Frontend lint + format check
         working-directory: frontend
-        run: pnpm run check
+        run: pnpm check
+
+      - name: Install E2E dependencies
+        working-directory: tests/e2e
+        run: pnpm install --frozen-lockfile
+
+      - name: E2E lint + format check
+        working-directory: tests/e2e
+        run: pnpm check
 
   test-backend:
     name: Backend Tests
