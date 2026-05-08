@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -66,6 +66,8 @@ if settings.cors_origin_list:
         allow_headers=["*"],
     )
 
-app.include_router(banking.router)
-app.include_router(users.router)
-app.include_router(fido.router)
+api = APIRouter(prefix="/api")
+api.include_router(banking.router)
+api.include_router(users.router)
+api.include_router(fido.router)
+app.include_router(api)

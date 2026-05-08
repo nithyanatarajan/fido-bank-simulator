@@ -9,7 +9,7 @@ from starlette.testclient import TestClient
 
 
 class TestBankingAPI:
-    """Tests for banking endpoints: /health, /transfer, /config/stepup."""
+    """Tests for banking endpoints: /api/health, /api/transfer, /api/config/stepup."""
 
     def setup_method(self) -> None:
         """Reset stores and wire fresh singletons before each test."""
@@ -24,44 +24,53 @@ class TestBankingAPI:
 
     def _login(self, username: str = "alice", password: str = "pass123") -> None:
         """Register and login a user."""
-        self.client.post("/users/register", json={"username": username, "password": password})
-        self.client.post("/users/login", json={"username": username, "password": password})
+        self.client.post("/api/users/register", json={"username": username, "password": password})
+        self.client.post("/api/users/login", json={"username": username, "password": password})
 
     # --- /health ---
 
     def test_health_returns_ok(self) -> None:
-        resp = self.client.get("/health")
+        resp = self.client.get("/api/health")
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
 
     # --- /transfer ---
 
     def test_transfer_requires_auth(self) -> None:
-        resp = self.client.post("/transfer")
+        resp = self.client.post("/api/transfer")
         assert resp.status_code == 401
 
     def test_transfer_with_stepup_enabled(self) -> None:
         self._login()
-        resp = self.client.post("/transfer")
+        resp = self.client.post("/api/transfer")
         assert resp.status_code == 200
         assert resp.json()["status"] == "step_up_required"
 
     def test_transfer_with_stepup_disabled(self) -> None:
         banking_module.fido_stepup_enabled = False
         self._login()
-        resp = self.client.post("/transfer")
+        resp = self.client.post("/api/transfer")
         assert resp.status_code == 200
         assert resp.json()["status"] == "success"
 
     # --- /config/stepup ---
 
     def test_stepup_config_returns_enabled(self) -> None:
-        resp = self.client.get("/config/stepup")
+        resp = self.client.get("/api/config/stepup")
         assert resp.status_code == 200
         assert resp.json()["fido_stepup_enabled"] is True
 
     def test_stepup_config_returns_disabled(self) -> None:
         banking_module.fido_stepup_enabled = False
-        resp = self.client.get("/config/stepup")
+        resp = self.client.get("/api/config/stepup")
         assert resp.status_code == 200
         assert resp.json()["fido_stepup_enabled"] is False
+
+    # --- /api prefix enforcement ---
+
+    def test_old_paths_without_api_prefix_return_404(self) -> None:
+        assert self.client.get("/health").status_code == 404
+        assert self.client.post("/transfer").status_code == 404
+        assert self.client.get("/config/stepup").status_code == 404
+        assert self.client.post("/users/register", json={"username": "a", "password": "b"}).status_code == 404
+        assert self.client.post("/fido/register/begin").status_code == 404

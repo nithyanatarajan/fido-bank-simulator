@@ -32,18 +32,18 @@ class TestFidoAPI:
 
     def _login(self, username: str = "alice", password: str = "pass123") -> None:
         """Register and login a user, setting session cookie on the client."""
-        self.client.post("/users/register", json={"username": username, "password": password})
-        self.client.post("/users/login", json={"username": username, "password": password})
+        self.client.post("/api/users/register", json={"username": username, "password": password})
+        self.client.post("/api/users/login", json={"username": username, "password": password})
 
     # --- /fido/register/begin ---
 
     def test_register_begin_requires_auth(self) -> None:
-        resp = self.client.post("/fido/register/begin")
+        resp = self.client.post("/api/fido/register/begin")
         assert resp.status_code == 401
 
     def test_register_begin_returns_public_key_and_token(self) -> None:
         self._login()
-        resp = self.client.post("/fido/register/begin")
+        resp = self.client.post("/api/fido/register/begin")
         assert resp.status_code == 200
         data = resp.json()
         assert "publicKey" in data
@@ -54,7 +54,7 @@ class TestFidoAPI:
 
     def test_register_complete_requires_auth(self) -> None:
         resp = self.client.post(
-            "/fido/register/complete",
+            "/api/fido/register/complete",
             json={"challenge_token": "fake", "attestation": {}},
         )
         assert resp.status_code == 401
@@ -62,7 +62,7 @@ class TestFidoAPI:
     def test_register_complete_rejects_invalid_token(self) -> None:
         self._login()
         resp = self.client.post(
-            "/fido/register/complete",
+            "/api/fido/register/complete",
             json={"challenge_token": "invalid-token", "attestation": {}},
         )
         assert resp.status_code in (400, 500)
@@ -71,39 +71,39 @@ class TestFidoAPI:
 
     def test_credentials_empty_for_new_user(self) -> None:
         self._login()
-        resp = self.client.get("/fido/credentials")
+        resp = self.client.get("/api/fido/credentials")
         assert resp.status_code == 200
         assert resp.json()["credentials"] == []
 
     def test_credentials_requires_auth(self) -> None:
-        resp = self.client.get("/fido/credentials")
+        resp = self.client.get("/api/fido/credentials")
         assert resp.status_code == 401
 
     # --- /fido/credentials/{id} DELETE ---
 
     def test_delete_credential_requires_auth(self) -> None:
-        resp = self.client.delete("/fido/credentials/AQIDBA")
+        resp = self.client.delete("/api/fido/credentials/AQIDBA")
         assert resp.status_code == 401
 
     def test_delete_credential_not_found(self) -> None:
         self._login()
-        resp = self.client.delete("/fido/credentials/AQIDBA")
+        resp = self.client.delete("/api/fido/credentials/AQIDBA")
         assert resp.status_code == 404
 
     def test_delete_credential_invalid_base64(self) -> None:
         self._login()
-        resp = self.client.delete("/fido/credentials/%00%ff%fe")
+        resp = self.client.delete("/api/fido/credentials/%00%ff%fe")
         assert resp.status_code in (400, 404)
 
     # --- /fido/auth/begin ---
 
     def test_auth_begin_requires_auth(self) -> None:
-        resp = self.client.post("/fido/auth/begin")
+        resp = self.client.post("/api/fido/auth/begin")
         assert resp.status_code == 401
 
     def test_auth_begin_no_passkeys(self) -> None:
         self._login()
-        resp = self.client.post("/fido/auth/begin")
+        resp = self.client.post("/api/fido/auth/begin")
         assert resp.status_code == 400
         assert "No passkeys" in resp.json()["message"]
 
@@ -111,7 +111,7 @@ class TestFidoAPI:
 
     def test_auth_complete_requires_auth(self) -> None:
         resp = self.client.post(
-            "/fido/auth/complete",
+            "/api/fido/auth/complete",
             json={"challenge_token": "fake", "assertion": {}},
         )
         assert resp.status_code == 401
@@ -119,7 +119,7 @@ class TestFidoAPI:
     def test_auth_complete_rejects_invalid_token(self) -> None:
         self._login()
         resp = self.client.post(
-            "/fido/auth/complete",
+            "/api/fido/auth/complete",
             json={"challenge_token": "invalid-token", "assertion": {"rawId": "AQID"}},
         )
         assert resp.status_code in (400, 500)
