@@ -2,8 +2,6 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    bank_host: str = "0.0.0.0"
-    bank_port: int = 9090
     fido_stepup_enabled: bool = True
     rp_id: str = ""
     rp_name: str = ""
@@ -13,7 +11,7 @@ class Settings(BaseSettings):
     cors_origins: str = ""
     session_max_age_seconds: int = 3600
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @property
     def cors_origin_list(self) -> list[str]:
