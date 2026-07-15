@@ -1,78 +1,172 @@
-import { describe, it, expect } from 'vitest';
-import { base64urlToBuffer, bufferToBase64url } from './webauthn.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-describe('base64urlToBuffer', () => {
-  it('converts a base64url string to ArrayBuffer', () => {
-    const input = 'SGVsbG8'; // "Hello" in base64url
-    const buffer = base64urlToBuffer(input);
-    const text = new TextDecoder().decode(buffer);
-    expect(text).toBe('Hello');
-  });
+import {
+  serializeAttestation,
+  serializeAssertion,
+  toCreateOptions,
+  toGetOptions,
+  registerPasskey,
+  authenticatePasskey,
+} from './webauthn.js';
 
-  it('handles base64url characters (- and _)', () => {
-    // Standard base64 uses + and /, base64url uses - and _
-    const input = 'ab-c_d'; // contains - and _
-    const buffer = base64urlToBuffer(input);
-    expect(buffer).toBeInstanceOf(ArrayBuffer);
-    expect(buffer.byteLength).toBeGreaterThan(0);
-  });
+function mockCredential() {
+  return {
+    id: 'cred-1',
+    rawId: new ArrayBuffer(4),
+    type: 'public-key',
+    response: { clientDataJSON: new ArrayBuffer(4), attestationObject: new ArrayBuffer(4) },
+  };
+}
 
-  it('handles padding correctly', () => {
-    // base64url omits padding, but the function should handle it
-    const input = 'YQ'; // "a" without padding (would be "YQ==" in standard base64)
-    const buffer = base64urlToBuffer(input);
-    const text = new TextDecoder().decode(buffer);
-    expect(text).toBe('a');
-  });
+function mockAssertionObj() {
+  return {
+    id: 'assert-1',
+    rawId: new ArrayBuffer(4),
+    type: 'public-key',
+    response: {
+      clientDataJSON: new ArrayBuffer(4),
+      authenticatorData: new ArrayBuffer(4),
+      signature: new ArrayBuffer(4),
+      userHandle: null,
+    },
+  };
+}
 
-  it('round-trips with bufferToBase64url', () => {
-    const original = 'dGVzdCBkYXRhIGZvciByb3VuZCB0cmlw';
-    const buffer = base64urlToBuffer(original);
-    const result = bufferToBase64url(buffer);
-    expect(result).toBe(original);
-  });
+function beginRegResponse() {
+  return {
+    publicKey: { challenge: 'YQ', user: { id: 'YQ', name: 'alice' }, excludeCredentials: [] },
+    challenge_token: 'tok',
+  };
+}
 
-  it('handles empty input', () => {
-    const buffer = base64urlToBuffer('');
-    expect(buffer.byteLength).toBe(0);
+function beginAuthResponse() {
+  return { publicKey: { challenge: 'YQ', allowCredentials: [] }, challenge_token: 'tok' };
+}
+
+// --- Unit tests ---
+
+describe('serializeAttestation', () => {
+  it('serializes credential fields to base64url', () => {
+    const result = serializeAttestation(mockCredential());
+    expect(result.id).toBe('cred-1');
+    expect(typeof result.rawId).toBe('string');
+    expect(typeof result.response.clientDataJSON).toBe('string');
   });
 });
 
-describe('bufferToBase64url', () => {
-  it('converts an ArrayBuffer to base64url string', () => {
-    const text = 'Hello';
-    const buffer = new TextEncoder().encode(text).buffer;
-    const result = bufferToBase64url(buffer);
-    expect(result).toBe('SGVsbG8');
+describe('serializeAssertion', () => {
+  it('serializes assertion fields', () => {
+    const result = serializeAssertion(mockAssertionObj());
+    expect(result.id).toBe('assert-1');
+    expect(result.response.userHandle).toBeNull();
   });
 
-  it('does not include padding characters', () => {
-    const buffer = new TextEncoder().encode('a').buffer;
-    const result = bufferToBase64url(buffer);
-    expect(result).not.toContain('=');
-    expect(result).toBe('YQ');
+  it('serializes userHandle when present', () => {
+    const a = mockAssertionObj();
+    a.response.userHandle = new ArrayBuffer(4);
+    expect(typeof serializeAssertion(a).response.userHandle).toBe('string');
+  });
+});
+
+describe('toCreateOptions', () => {
+  it('converts base64url to ArrayBuffers', () => {
+    const result = toCreateOptions({
+      challenge: 'YQ',
+      user: { id: 'YQ', name: 'a' },
+      excludeCredentials: [{ id: 'YQ', type: 'public-key' }],
+    });
+    expect(result.publicKey.challenge).toBeInstanceOf(ArrayBuffer);
+    expect(result.publicKey.user.id).toBeInstanceOf(ArrayBuffer);
+    expect(result.publicKey.excludeCredentials[0].id).toBeInstanceOf(ArrayBuffer);
   });
 
-  it('uses url-safe characters (- and _ instead of + and /)', () => {
-    // Create a buffer that would produce + or / in standard base64
-    const bytes = new Uint8Array([251, 239, 190]); // produces "++/+" in base64
-    const result = bufferToBase64url(bytes.buffer);
-    expect(result).not.toContain('+');
-    expect(result).not.toContain('/');
+  it('handles missing excludeCredentials', () => {
+    const result = toCreateOptions({ challenge: 'YQ', user: { id: 'YQ', name: 'a' } });
+    expect(result.publicKey.excludeCredentials).toEqual([]);
+  });
+});
+
+describe('toGetOptions', () => {
+  it('converts base64url to ArrayBuffers', () => {
+    const result = toGetOptions({
+      challenge: 'YQ',
+      allowCredentials: [{ id: 'YQ', type: 'public-key' }],
+    });
+    expect(result.publicKey.challenge).toBeInstanceOf(ArrayBuffer);
+    expect(result.publicKey.allowCredentials[0].id).toBeInstanceOf(ArrayBuffer);
+  });
+});
+
+// --- Integration tests ---
+
+describe('registerPasskey', () => {
+  let fetchSpy;
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
   });
 
-  it('handles empty buffer', () => {
-    const buffer = new ArrayBuffer(0);
-    const result = bufferToBase64url(buffer);
-    expect(result).toBe('');
+  it('completes registration', async () => {
+    fetchSpy
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(beginRegResponse()) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ status: 'ok' }) });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { credentials: { create: vi.fn().mockResolvedValue(mockCredential()) } },
+      configurable: true,
+    });
+
+    const result = await registerPasskey();
+
+    expect(result).toEqual({ status: 'ok' });
+    const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
+    expect(body.challenge_token).toBe('tok');
+    expect(body.attestation.id).toBe('cred-1');
   });
 
-  it('handles binary data correctly', () => {
-    const bytes = new Uint8Array([0, 1, 2, 255, 254, 253]);
-    const result = bufferToBase64url(bytes.buffer);
-    // Round-trip to verify
-    const decoded = base64urlToBuffer(result);
-    const decodedBytes = new Uint8Array(decoded);
-    expect(Array.from(decodedBytes)).toEqual([0, 1, 2, 255, 254, 253]);
+  it('throws when begin fails', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'fail' }) });
+    await expect(registerPasskey()).rejects.toThrow('fail');
+  });
+
+  it('throws when complete fails', async () => {
+    fetchSpy
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(beginRegResponse()) })
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'invalid' }) });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { credentials: { create: vi.fn().mockResolvedValue(mockCredential()) } },
+      configurable: true,
+    });
+
+    await expect(registerPasskey()).rejects.toThrow('invalid');
+  });
+});
+
+describe('authenticatePasskey', () => {
+  let fetchSpy;
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  it('completes authentication', async () => {
+    fetchSpy
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(beginAuthResponse()) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ status: 'ok' }) });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { credentials: { get: vi.fn().mockResolvedValue(mockAssertionObj()) } },
+      configurable: true,
+    });
+
+    const result = await authenticatePasskey();
+
+    expect(result).toEqual({ status: 'ok' });
+    const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
+    expect(body.challenge_token).toBe('tok');
+    expect(body.assertion.id).toBe('assert-1');
+  });
+
+  it('throws when begin fails', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'fail' }) });
+    await expect(authenticatePasskey()).rejects.toThrow('fail');
   });
 });

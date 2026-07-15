@@ -1,56 +1,53 @@
 /**
- * WebAuthn helper functions for passkey registration and authentication.
+ * WebAuthn passkey registration and authentication flows.
  */
+import { base64urlToBuffer, bufferToBase64url } from './encoding.js';
 
 /**
- * Convert a base64url string to an ArrayBuffer.
- * @param {string} base64url
- * @returns {ArrayBuffer}
+ * Serialize a WebAuthn attestation credential for the server.
+ * @param {PublicKeyCredential} credential
+ * @returns {object}
  */
-export function base64urlToBuffer(base64url) {
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
-  const binary = atob(base64 + pad);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
+export function serializeAttestation(credential) {
+  return {
+    id: credential.id,
+    rawId: bufferToBase64url(credential.rawId),
+    type: credential.type,
+    response: {
+      clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+      attestationObject: bufferToBase64url(credential.response.attestationObject),
+    },
+  };
 }
 
 /**
- * Convert an ArrayBuffer to a base64url string.
- * @param {ArrayBuffer} buffer
- * @returns {string}
+ * Serialize a WebAuthn assertion for the server.
+ * @param {PublicKeyCredential} assertion
+ * @returns {object}
  */
-export function bufferToBase64url(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+export function serializeAssertion(assertion) {
+  return {
+    id: assertion.id,
+    rawId: bufferToBase64url(assertion.rawId),
+    type: assertion.type,
+    response: {
+      clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
+      authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+      signature: bufferToBase64url(assertion.response.signature),
+      userHandle: assertion.response.userHandle
+        ? bufferToBase64url(assertion.response.userHandle)
+        : null,
+    },
+  };
 }
 
 /**
- * Register a new passkey for the current user.
- * @returns {Promise<void>}
+ * Convert publicKey options from server JSON to navigator.credentials.create() format.
+ * @param {object} publicKey
+ * @returns {object}
  */
-export async function registerPasskey() {
-  // Step 1: Get registration options from server
-  const beginResp = await fetch('/api/fido/register/begin', {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!beginResp.ok) {
-    const data = await beginResp.json();
-    throw new Error(data.message || 'Failed to begin registration');
-  }
-  const beginData = await beginResp.json();
-  const { publicKey, challenge_token } = beginData;
-
-  // Step 2: Convert base64url fields to ArrayBuffers for WebAuthn API
-  const createOptions = {
+export function toCreateOptions(publicKey) {
+  return {
     publicKey: {
       ...publicKey,
       challenge: base64urlToBuffer(publicKey.challenge),
@@ -64,53 +61,15 @@ export async function registerPasskey() {
       })),
     },
   };
-
-  // Step 3: Call WebAuthn API
-  const credential = await navigator.credentials.create(createOptions);
-
-  // Step 4: Serialize attestation response for server
-  const attestation = {
-    id: credential.id,
-    rawId: bufferToBase64url(credential.rawId),
-    type: credential.type,
-    response: {
-      clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
-      attestationObject: bufferToBase64url(credential.response.attestationObject),
-    },
-  };
-
-  // Step 5: Complete registration on server
-  const completeResp = await fetch('/api/fido/register/complete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ challenge_token, attestation }),
-  });
-  if (!completeResp.ok) {
-    const data = await completeResp.json();
-    throw new Error(data.message || 'Failed to complete registration');
-  }
 }
 
 /**
- * Authenticate with a registered passkey.
- * @returns {Promise<void>}
+ * Convert publicKey options from server JSON to navigator.credentials.get() format.
+ * @param {object} publicKey
+ * @returns {object}
  */
-export async function authenticatePasskey() {
-  // Step 1: Get authentication options from server
-  const beginResp = await fetch('/api/fido/auth/begin', {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!beginResp.ok) {
-    const data = await beginResp.json();
-    throw new Error(data.message || 'Failed to begin authentication');
-  }
-  const beginData = await beginResp.json();
-  const { publicKey, challenge_token } = beginData;
-
-  // Step 2: Convert base64url fields to ArrayBuffers
-  const getOptions = {
+export function toGetOptions(publicKey) {
+  return {
     publicKey: {
       ...publicKey,
       challenge: base64urlToBuffer(publicKey.challenge),
@@ -120,34 +79,72 @@ export async function authenticatePasskey() {
       })),
     },
   };
+}
 
-  // Step 3: Call WebAuthn API
-  const assertion = await navigator.credentials.get(getOptions);
-
-  // Step 4: Serialize assertion response for server
-  const assertionData = {
-    id: assertion.id,
-    rawId: bufferToBase64url(assertion.rawId),
-    type: assertion.type,
-    response: {
-      clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
-      authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
-      signature: bufferToBase64url(assertion.response.signature),
-      userHandle: assertion.response.userHandle
-        ? bufferToBase64url(assertion.response.userHandle)
-        : null,
-    },
-  };
-
-  // Step 5: Complete authentication on server
-  const completeResp = await fetch('/api/fido/auth/complete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ challenge_token, assertion: assertionData }),
-  });
-  if (!completeResp.ok) {
-    const data = await completeResp.json();
-    throw new Error(data.message || 'Failed to complete authentication');
+/**
+ * POST to a FIDO endpoint and return parsed JSON.
+ * @param {string} url
+ * @param {object} [body]
+ * @returns {Promise<object>}
+ */
+async function fidoPost(url, body) {
+  const options = { method: 'POST', credentials: 'include' };
+  if (body) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(body);
   }
+  const resp = await fetch(url, options);
+  if (!resp.ok) {
+    const data = await resp.json();
+    throw new Error(data.message || 'Request failed');
+  }
+  return await resp.json();
+}
+
+/**
+ * Register a new passkey for the current user.
+ *
+ * Flow:
+ *   1. POST /fido/register/begin → publicKey + challenge token
+ *   2. navigator.credentials.create() → attestation
+ *   3. POST /fido/register/complete (attestation)
+ */
+export async function registerPasskey() {
+  // Get registration options and the challenge token from the server
+  const beginData = await fidoPost('/api/fido/register/begin');
+  const { publicKey, challenge_token } = beginData;
+
+  // Create the credential via the WebAuthn API and serialize it for the server
+  const credential = await navigator.credentials.create(toCreateOptions(publicKey));
+  const attestation = serializeAttestation(credential);
+
+  // Complete registration on the server
+  return await fidoPost('/api/fido/register/complete', {
+    challenge_token,
+    attestation,
+  });
+}
+
+/**
+ * Authenticate with a registered passkey.
+ *
+ * Flow:
+ *   1. POST /fido/auth/begin → publicKey + challenge token
+ *   2. navigator.credentials.get() → assertion
+ *   3. POST /fido/auth/complete (assertion)
+ */
+export async function authenticatePasskey() {
+  // Get authentication options and the challenge token from the server
+  const beginData = await fidoPost('/api/fido/auth/begin');
+  const { publicKey, challenge_token } = beginData;
+
+  // Obtain the assertion via the WebAuthn API and serialize it for the server
+  const assertion = await navigator.credentials.get(toGetOptions(publicKey));
+  const assertionData = serializeAssertion(assertion);
+
+  // Complete authentication on the server
+  return await fidoPost('/api/fido/auth/complete', {
+    challenge_token,
+    assertion: assertionData,
+  });
 }

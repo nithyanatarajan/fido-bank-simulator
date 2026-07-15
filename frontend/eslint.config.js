@@ -30,6 +30,7 @@ export default [
       ecmaVersion: 2024,
       sourceType: 'module',
       globals: {
+        globalThis: 'readonly',
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
         ArrayBuffer: 'readonly',
