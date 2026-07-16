@@ -175,7 +175,7 @@ cp backend/env.sample backend/.env
 | `RP_ID` | `localhost` | WebAuthn Relying Party ID |
 | `RP_NAME` | `FIDO Bank Simulator` | WebAuthn Relying Party name |
 | `RP_ORIGIN` | `http://localhost:9090` | WebAuthn expected origin |
-| `JWT_SECRET` | `change-me-in-production` | Secret for challenge tokens and sessions |
+| `JWT_SECRET` | `you-should-change-me-in-production` | Secret for challenge tokens and sessions |
 | `JWT_EXPIRY_SECONDS` | `300` | Challenge token expiry (seconds) |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed origins for CORS |
 | `SESSION_MAX_AGE_SECONDS` | `3600` | Session cookie and token expiry (seconds) |
