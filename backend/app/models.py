@@ -31,5 +31,14 @@ class FidoAuthCompleteRequest(BaseModel):
     assertion: dict[str, Any]
 
 
+class FidoLoginBeginRequest(BaseModel):
+    username: str
+
+
+class FidoLoginCompleteRequest(BaseModel):
+    challenge_token: str
+    assertion: dict[str, Any]
+
+
 class TransferRequest(BaseModel):
     amount: float = Field(gt=0)

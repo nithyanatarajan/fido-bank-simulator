@@ -2,6 +2,7 @@
  * Login/New Account page with tab switching.
  */
 import { login, register } from '../api.js';
+import { loginWithPasskey } from '../webauthn.js';
 
 export function renderLogin(container, onLogin) {
   let activeTab = 'login';
@@ -41,6 +42,14 @@ export function renderLogin(container, onLogin) {
               <button type="submit" class="btn btn-primary w-100 py-2" data-testid="submit-btn">
                 ${activeTab === 'login' ? 'Login' : 'Create Account'}
               </button>
+              ${
+                activeTab === 'login'
+                  ? `<button type="button" class="btn btn-outline-primary w-100 py-2 mt-2"
+                       data-testid="passkey-login-btn" id="passkey-login-btn">
+                       Login with passkey
+                     </button>`
+                  : ''
+              }
               <div id="auth-error" class="text-danger mt-3 small" data-testid="auth-error"></div>
               <div id="auth-success" class="text-success mt-3 small" data-testid="auth-success"></div>
             </form>
@@ -55,6 +64,27 @@ export function renderLogin(container, onLogin) {
         render();
       });
     });
+
+    const passkeyBtn = container.querySelector('#passkey-login-btn');
+    if (passkeyBtn) {
+      passkeyBtn.addEventListener('click', async () => {
+        const username = container.querySelector('#username').value;
+        const errorEl = container.querySelector('#auth-error');
+        const successEl = container.querySelector('#auth-success');
+        errorEl.textContent = '';
+        successEl.textContent = '';
+        if (!username) {
+          errorEl.textContent = 'Enter your username to log in with a passkey.';
+          return;
+        }
+        try {
+          await loginWithPasskey(username);
+          onLogin(username);
+        } catch (err) {
+          errorEl.textContent = err.message;
+        }
+      });
+    }
 
     container.querySelector('#auth-form').addEventListener('submit', async (e) => {
       e.preventDefault();

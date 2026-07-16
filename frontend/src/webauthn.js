@@ -148,3 +148,32 @@ export async function authenticatePasskey() {
     assertion: assertionData,
   });
 }
+
+/**
+ * Log in with a passkey (passwordless, username-first).
+ *
+ * Unlike authenticatePasskey (step-up, which reuses the current session), this
+ * establishes a new session: login/complete sets the session cookie on success.
+ *
+ * Flow:
+ *   1. POST /fido/login/begin { username } → publicKey + challenge token
+ *   2. navigator.credentials.get() → assertion
+ *   3. POST /fido/login/complete (assertion) → session cookie set
+ *
+ * @param {string} username
+ */
+export async function loginWithPasskey(username) {
+  // Get authentication options for this user and the challenge token
+  const beginData = await fidoPost('/api/fido/login/begin', { username });
+  const { publicKey, challenge_token } = beginData;
+
+  // Obtain the assertion via the WebAuthn API and serialize it for the server
+  const assertion = await navigator.credentials.get(toGetOptions(publicKey));
+  const assertionData = serializeAssertion(assertion);
+
+  // Complete login on the server (sets the session cookie)
+  return await fidoPost('/api/fido/login/complete', {
+    challenge_token,
+    assertion: assertionData,
+  });
+}

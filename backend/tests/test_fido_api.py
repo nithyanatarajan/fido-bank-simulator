@@ -123,3 +123,31 @@ class TestFidoAPI:
             json={"challenge_token": "invalid-token", "assertion": {"rawId": "AQID"}},
         )
         assert resp.status_code in (400, 500)
+
+    # --- /fido/login/begin (passwordless, no session) ---
+
+    def test_login_begin_no_session_required_but_no_passkeys(self) -> None:
+        # Registered user with no passkeys: reachable without a session cookie,
+        # returns 400 (proves the endpoint does not require authentication).
+        self.client.post("/api/users/register", json={"username": "bob", "password": "pass123"})
+        resp = self.client.post("/api/fido/login/begin", json={"username": "bob"})
+        assert resp.status_code == 400
+        assert "No passkeys" in resp.json()["message"]
+
+    def test_login_begin_unknown_user_returns_400(self) -> None:
+        resp = self.client.post("/api/fido/login/begin", json={"username": "ghost"})
+        assert resp.status_code == 400
+        assert "No passkeys" in resp.json()["message"]
+
+    def test_login_begin_requires_username(self) -> None:
+        resp = self.client.post("/api/fido/login/begin", json={})
+        assert resp.status_code == 422
+
+    # --- /fido/login/complete ---
+
+    def test_login_complete_rejects_invalid_token(self) -> None:
+        resp = self.client.post(
+            "/api/fido/login/complete",
+            json={"challenge_token": "invalid-token", "assertion": {"rawId": "AQID"}},
+        )
+        assert resp.status_code in (400, 500)

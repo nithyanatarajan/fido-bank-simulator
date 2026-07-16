@@ -7,6 +7,7 @@ import {
   toGetOptions,
   registerPasskey,
   authenticatePasskey,
+  loginWithPasskey,
 } from './webauthn.js';
 
 function mockCredential() {
@@ -168,5 +169,43 @@ describe('authenticatePasskey', () => {
   it('throws when begin fails', async () => {
     fetchSpy.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'fail' }) });
     await expect(authenticatePasskey()).rejects.toThrow('fail');
+  });
+});
+
+describe('loginWithPasskey', () => {
+  let fetchSpy;
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  it('sends username to begin and completes login', async () => {
+    fetchSpy
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(beginAuthResponse()) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ status: 'ok' }) });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { credentials: { get: vi.fn().mockResolvedValue(mockAssertionObj()) } },
+      configurable: true,
+    });
+
+    const result = await loginWithPasskey('alice');
+
+    expect(result).toEqual({ status: 'ok' });
+    // begin carries the username
+    expect(fetchSpy.mock.calls[0][0]).toBe('/api/fido/login/begin');
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body)).toEqual({ username: 'alice' });
+    // complete carries the challenge token and assertion
+    expect(fetchSpy.mock.calls[1][0]).toBe('/api/fido/login/complete');
+    const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
+    expect(body.challenge_token).toBe('tok');
+    expect(body.assertion.id).toBe('assert-1');
+  });
+
+  it('throws when begin fails', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ message: 'No passkeys registered' }),
+    });
+    await expect(loginWithPasskey('ghost')).rejects.toThrow('No passkeys registered');
   });
 });

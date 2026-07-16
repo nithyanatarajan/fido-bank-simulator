@@ -3,10 +3,15 @@
 import base64
 from typing import Any
 
-from fastapi import APIRouter, Cookie
+from fastapi import APIRouter, Cookie, Response
 from starlette.responses import JSONResponse
 
-from app.models import FidoAuthCompleteRequest, FidoRegisterCompleteRequest
+from app.models import (
+    FidoAuthCompleteRequest,
+    FidoLoginBeginRequest,
+    FidoLoginCompleteRequest,
+    FidoRegisterCompleteRequest,
+)
 from app.services.fido_service import FidoService
 from app.services.session import SessionManager
 
@@ -92,6 +97,77 @@ def register_complete(
             credential_id=cred_data.credential_id,
             credential_data=cred_data,
             sign_count=auth_data.counter,
+        )
+        return {"status": "ok"}
+    except (ValueError, KeyError) as e:
+        return JSONResponse(status_code=400, content={"message": str(e)})
+    except Exception:
+        return JSONResponse(status_code=500, content={"message": "Internal server error"})
+
+
+@router.post("/login/begin", response_model=None)
+def login_begin(req: FidoLoginBeginRequest) -> dict[str, Any] | JSONResponse:
+    """Begin passwordless passkey login for a given username (no session required).
+
+    Note: returning a distinct "No passkeys registered" error reveals whether a
+    username has passkeys (enumeration). Acceptable for this simulator; the
+    production fix is to return a challenge with decoy allowCredentials so the
+    response is indistinguishable.
+    """
+    assert fido_service is not None
+    creds = fido_service.get_credentials(req.username)
+    if not creds:
+        return JSONResponse(status_code=400, content={"message": "No passkeys registered"})
+
+    options, state = fido_service.authenticate_begin(req.username)
+    # Carry the username inside the signed challenge token so login/complete can
+    # establish the session without a pre-existing cookie or a tamperable field.
+    state["username"] = req.username
+    challenge_token = fido_service.create_challenge_token(state)
+
+    serialized = _serialize_public_key(dict(options))
+    return {
+        "publicKey": serialized.get("publicKey", serialized),
+        "challenge_token": challenge_token,
+    }
+
+
+@router.post("/login/complete", response_model=None)
+def login_complete(
+    req: FidoLoginCompleteRequest,
+    response: Response,
+) -> dict[str, str] | JSONResponse:
+    """Complete passkey login. Validates the assertion and sets the session cookie."""
+    assert fido_service is not None
+    assert session_manager is not None
+    # Import session_max_age from users module to match the password-login cookie.
+    from app.routers.users import session_max_age
+
+    try:
+        state = fido_service.verify_challenge_token(req.challenge_token)
+        username = state.pop("username")
+        # Look up the specific credential used from the assertion's rawId
+        padded = req.assertion["rawId"] + "=" * (-len(req.assertion["rawId"]) % 4)
+        credential_id = base64.urlsafe_b64decode(padded)
+        fido_service.authenticate_complete(state, credential_id, username, req.assertion)
+
+        # Extract sign count from authenticator data
+        auth_data_b64 = req.assertion.get("response", {}).get("authenticatorData", "")
+        if auth_data_b64:
+            auth_data_padded = auth_data_b64 + "=" * (-len(auth_data_b64) % 4)
+            auth_data_bytes = base64.urlsafe_b64decode(auth_data_padded)
+            # Sign count is bytes 33-36 (big-endian uint32) in authenticator data
+            if len(auth_data_bytes) >= 37:
+                new_sign_count = int.from_bytes(auth_data_bytes[33:37], "big")
+                fido_service.update_sign_count(credential_id, new_sign_count)
+
+        token = session_manager.create_token(username)
+        response.set_cookie(
+            key="session",
+            value=token,
+            httponly=True,
+            samesite="strict",
+            max_age=session_max_age,
         )
         return {"status": "ok"}
     except (ValueError, KeyError) as e:
