@@ -45,6 +45,7 @@ def _wire_singletons() -> None:
 
     banking.session_manager = session_manager
     banking.fido_stepup_enabled = settings.fido_stepup_enabled
+    banking.fido_stepup_threshold = settings.fido_stepup_threshold
 
 
 @asynccontextmanager

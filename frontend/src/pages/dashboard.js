@@ -1,7 +1,7 @@
 /**
  * Dashboard page showing user info, passkeys, and banking actions.
  */
-import { logout } from '../api.js';
+import { getStepupConfig, logout } from '../api.js';
 import { authenticatePasskey, registerPasskey } from '../webauthn.js';
 
 /**
@@ -117,9 +117,15 @@ export function renderDashboard(container, username, onLogout) {
               <h5 class="card-title mb-0">&#128179; Banking</h5>
             </div>
             <div class="card-body">
-              <p class="text-muted small mb-3">
-                Transfers require step-up verification with a registered passkey.
+              <p class="text-muted small mb-3" id="stepup-info" data-testid="stepup-info">
+                Large transfers require step-up verification with a registered passkey.
               </p>
+              <div class="mb-3">
+                <label for="transfer-amount" class="form-label">Amount ($)</label>
+                <input type="number" class="form-control" id="transfer-amount"
+                       data-testid="transfer-amount" min="0.01" step="0.01"
+                       placeholder="Enter amount" />
+              </div>
               <button class="btn btn-success" data-testid="transfer-btn" id="transfer-btn">
                 Transfer Money
               </button>
@@ -172,6 +178,20 @@ export function renderDashboard(container, username, onLogout) {
 
   loadPasskeys(passkeyList, handleDeletePasskey);
 
+  // Show the step-up threshold so the user knows when a passkey will be required
+  const stepupInfo = container.querySelector('#stepup-info');
+  getStepupConfig()
+    .then((cfg) => {
+      if (cfg.fido_stepup_enabled) {
+        stepupInfo.textContent = `Transfers over $${cfg.fido_stepup_threshold} require passkey step-up verification.`;
+      } else {
+        stepupInfo.textContent = 'Step-up verification is currently disabled.';
+      }
+    })
+    .catch(() => {
+      /* Keep the default copy if the config can't be loaded */
+    });
+
   // Add Passkey
   container.querySelector('#add-passkey-btn').addEventListener('click', async () => {
     passkeyMsg.textContent = '';
@@ -193,9 +213,17 @@ export function renderDashboard(container, username, onLogout) {
   container.querySelector('#transfer-btn').addEventListener('click', async () => {
     transferMsg.textContent = '';
     transferMsg.className = 'mt-2 small';
+    const amount = Number(container.querySelector('#transfer-amount').value);
+    if (!amount || amount <= 0) {
+      transferMsg.textContent = 'Enter a valid amount.';
+      transferMsg.className = 'mt-2 small text-danger';
+      return;
+    }
     try {
       const resp = await fetch('/api/transfer', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
         credentials: 'include',
       });
       if (!resp.ok) {

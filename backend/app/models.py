@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MessageResponse(BaseModel):
@@ -29,3 +29,7 @@ class FidoRegisterCompleteRequest(BaseModel):
 class FidoAuthCompleteRequest(BaseModel):
     challenge_token: str
     assertion: dict[str, Any]
+
+
+class TransferRequest(BaseModel):
+    amount: float = Field(gt=0)

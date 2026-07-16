@@ -67,3 +67,17 @@ export async function getMe() {
   }
   return resp.json();
 }
+
+/**
+ * Get the step-up configuration (enabled flag and amount threshold).
+ * @returns {Promise<{fido_stepup_enabled: boolean, fido_stepup_threshold: number}>}
+ */
+export async function getStepupConfig() {
+  const resp = await fetch('/api/config/stepup', {
+    credentials: 'include',
+  });
+  if (!resp.ok) {
+    throw new Error('Failed to load step-up config');
+  }
+  return resp.json();
+}

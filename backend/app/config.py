@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     fido_stepup_enabled: bool = True
+    fido_stepup_threshold: float = 1000.0
     rp_id: str = ""
     rp_name: str = ""
     rp_origin: str = ""

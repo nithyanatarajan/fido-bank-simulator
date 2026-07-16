@@ -20,6 +20,7 @@ class TestBankingAPI:
         users_module.session_max_age = 3600
         banking_module.session_manager = session_manager
         banking_module.fido_stepup_enabled = True
+        banking_module.fido_stepup_threshold = 1000.0
         self.client = TestClient(app)
 
     def _login(self, username: str = "alice", password: str = "pass123") -> None:
@@ -37,19 +38,42 @@ class TestBankingAPI:
     # --- /transfer ---
 
     def test_transfer_requires_auth(self) -> None:
-        resp = self.client.post("/api/transfer")
+        resp = self.client.post("/api/transfer", json={"amount": 500})
         assert resp.status_code == 401
 
-    def test_transfer_with_stepup_enabled(self) -> None:
+    def test_transfer_missing_amount_returns_422(self) -> None:
         self._login()
-        resp = self.client.post("/api/transfer")
+        resp = self.client.post("/api/transfer", json={})
+        assert resp.status_code == 422
+
+    def test_transfer_rejects_non_positive_amount(self) -> None:
+        self._login()
+        resp = self.client.post("/api/transfer", json={"amount": 0})
+        assert resp.status_code == 422
+
+    def test_transfer_above_threshold_requires_stepup(self) -> None:
+        self._login()
+        resp = self.client.post("/api/transfer", json={"amount": 5000})
         assert resp.status_code == 200
         assert resp.json()["status"] == "step_up_required"
 
-    def test_transfer_with_stepup_disabled(self) -> None:
+    def test_transfer_below_threshold_completes(self) -> None:
+        self._login()
+        resp = self.client.post("/api/transfer", json={"amount": 500})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "success"
+
+    def test_transfer_at_threshold_completes(self) -> None:
+        # Threshold check is strict (>), so exactly-at-threshold completes.
+        self._login()
+        resp = self.client.post("/api/transfer", json={"amount": 1000})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "success"
+
+    def test_transfer_with_stepup_disabled_never_steps_up(self) -> None:
         banking_module.fido_stepup_enabled = False
         self._login()
-        resp = self.client.post("/api/transfer")
+        resp = self.client.post("/api/transfer", json={"amount": 100000})
         assert resp.status_code == 200
         assert resp.json()["status"] == "success"
 
@@ -59,6 +83,11 @@ class TestBankingAPI:
         resp = self.client.get("/api/config/stepup")
         assert resp.status_code == 200
         assert resp.json()["fido_stepup_enabled"] is True
+
+    def test_stepup_config_returns_threshold(self) -> None:
+        resp = self.client.get("/api/config/stepup")
+        assert resp.status_code == 200
+        assert resp.json()["fido_stepup_threshold"] == 1000.0
 
     def test_stepup_config_returns_disabled(self) -> None:
         banking_module.fido_stepup_enabled = False

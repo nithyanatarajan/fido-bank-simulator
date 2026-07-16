@@ -26,7 +26,9 @@ test.describe("Step-Up Authentication", () => {
       "Passkey registered successfully!",
     );
 
-    // Transfer triggers step-up, which the virtual authenticator satisfies
+    // An above-threshold transfer triggers step-up, which the virtual
+    // authenticator satisfies
+    await page.getByTestId("transfer-amount").fill("5000");
     await page.getByTestId("transfer-btn").click();
 
     await expect(page.getByTestId("transfer-message")).toHaveText(
@@ -34,8 +36,24 @@ test.describe("Step-Up Authentication", () => {
     );
   });
 
-  test("transfer without passkey shows error", async ({ page }) => {
-    // No passkey registered — step-up cannot complete
+  test("below-threshold transfer completes without step-up", async ({
+    page,
+  }) => {
+    // No passkey registered, but a small amount stays under the threshold, so
+    // no step-up ceremony is required
+    await page.getByTestId("transfer-amount").fill("100");
+    await page.getByTestId("transfer-btn").click();
+
+    await expect(page.getByTestId("transfer-message")).toHaveText(
+      "Transfer completed successfully!",
+    );
+  });
+
+  test("above-threshold transfer without passkey shows error", async ({
+    page,
+  }) => {
+    // No passkey registered — above-threshold step-up cannot complete
+    await page.getByTestId("transfer-amount").fill("5000");
     await page.getByTestId("transfer-btn").click();
 
     await expect(page.getByTestId("transfer-message")).toContainText(
@@ -62,6 +80,7 @@ test.describe("Step-Up Authentication", () => {
     await expect(page.getByTestId("welcome-user")).toBeVisible();
 
     // The passkey persists across sessions, so step-up still succeeds
+    await page.getByTestId("transfer-amount").fill("5000");
     await page.getByTestId("transfer-btn").click();
 
     await expect(page.getByTestId("transfer-message")).toHaveText(
@@ -75,12 +94,14 @@ test.describe("Step-Up Authentication", () => {
       "Passkey registered successfully!",
     );
 
-    // Each transfer requires its own step-up ceremony
+    // Each above-threshold transfer requires its own step-up ceremony
+    await page.getByTestId("transfer-amount").fill("5000");
     await page.getByTestId("transfer-btn").click();
     await expect(page.getByTestId("transfer-message")).toHaveText(
       "Transfer completed successfully!",
     );
 
+    await page.getByTestId("transfer-amount").fill("5000");
     await page.getByTestId("transfer-btn").click();
     await expect(page.getByTestId("transfer-message")).toHaveText(
       "Transfer completed successfully!",
